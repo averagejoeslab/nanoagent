@@ -281,6 +281,26 @@ async function agenticLoop(messages: Message[], systemPrompt: string): Promise<v
 
 // ─── REPL / UI ───────────────────────────────────────────────────────────────
 async function main() {
+  const oneOffPrompt = process.argv[2];
+  
+  // One-off mode: run single prompt and exit
+  if (oneOffPrompt) {
+    const { messages } = await loadTrace();
+    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}`;
+    
+    messages.push({ role: "user", content: oneOffPrompt });
+    await agenticLoop(messages, systemPrompt);
+    
+    await saveToTrace({
+      timestamp: new Date().toISOString(),
+      user: oneOffPrompt,
+      assistant: messages[messages.length - 1].content,
+    });
+    
+    return;
+  }
+  
+  // Interactive REPL mode
   console.log(`
 ${ANSI.bold}${ANSI.cyan}nanoagent${ANSI.reset}
 ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}
