@@ -5,7 +5,7 @@
  */
 
 // ─── IMPORTS ─────────────────────────────────────────────────────────────────
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { execSync } from "node:child_process";
 import * as readline from "node:readline";
 
@@ -14,6 +14,7 @@ const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 8192;
 const SHELL_TIMEOUT = 30000;
+const TRACE_FILE = ".nanoagent/trace.jsonl";
 
 const ANSI = {
   reset: "\x1b[0m",
@@ -132,6 +133,30 @@ function buildToolSchema() {
       required: params,
     },
   }));
+}
+
+// ─── MEMORY ──────────────────────────────────────────────────────────────────
+async function saveToTrace(turn: { timestamp: string; user: string; assistant: any }) {
+  await mkdir(".nanoagent", { recursive: true });
+  const line = JSON.stringify(turn) + "\n";
+  await Bun.write(TRACE_FILE, line, { append: true });
+}
+
+async function loadTrace(): Promise<Message[]> {
+  try {
+    const content = await readFile(TRACE_FILE, "utf-8");
+    const lines = content.trim().split("\n");
+    
+    const messages: Message[] = [];
+    for (const line of lines) {
+      const turn = JSON.parse(line);
+      messages.push({ role: "user", content: turn.user });
+      messages.push({ role: "assistant", content: turn.assistant });
+    }
+    return messages;
+  } catch {
+    return [];
+  }
 }
 
 // ─── LLM INTERFACE ───────────────────────────────────────────────────────────
