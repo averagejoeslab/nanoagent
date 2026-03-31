@@ -30,6 +30,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
+          export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}"
           bun nanoagent.ts "Review all TypeScript files in this repository. Check for:
           - Code quality issues
           - Potential bugs
