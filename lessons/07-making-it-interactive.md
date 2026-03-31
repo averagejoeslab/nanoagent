@@ -250,14 +250,176 @@ while (true) {
 Goodbye!
 ```
 
+## One-Off Mode for Automation
+
+Interactive mode is great for development, but what about automation?
+
+You can run a single command without entering the REPL:
+
+```bash
+bun nanoagent.ts "Create a hello.ts file with a hello function"
+```
+
+### Implementation
+
+Check for command-line arguments:
+
+```typescript
+async function main() {
+  const oneOffPrompt = process.argv[2];
+  
+  // One-off mode: run single prompt and exit
+  if (oneOffPrompt) {
+    const messages = [{ role: "user", content: oneOffPrompt }];
+    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}`;
+    
+    await agenticLoop(messages, systemPrompt);
+    return;
+  }
+  
+  // Otherwise, start interactive REPL
+  console.log("nanoagent");
+  // ... rest of REPL code
+}
+```
+
+### Use Cases
+
+**Scripts:**
+```bash
+#!/bin/bash
+bun nanoagent.ts "Run tests and create a summary in test-results.md"
+bun nanoagent.ts "Update version in package.json to 2.0.0"
+```
+
+**CI/CD Pipelines:**
+```yaml
+# .github/workflows/deploy.yml
+- name: Generate deployment docs
+  run: bun nanoagent.ts "Create deployment.md with current config details"
+
+- name: Update changelog
+  run: bun nanoagent.ts "Add today's changes to CHANGELOG.md from git log"
+```
+
+**Cron Jobs:**
+```bash
+# Daily report
+0 9 * * * cd /project && bun nanoagent.ts "Analyze yesterday's logs and email summary"
+```
+
+**Build Automation:**
+```json
+{
+  "scripts": {
+    "prepare-release": "bun nanoagent.ts 'Update README with latest API docs'",
+    "post-build": "bun nanoagent.ts 'Verify build artifacts and create manifest'"
+  }
+}
+```
+
+### How It Works
+
+1. **Check argv**: If `process.argv[2]` exists, it's the prompt
+2. **Run once**: Execute the agentic loop with that prompt
+3. **Exit**: Return immediately after completion
+4. **No REPL**: Never enters interactive mode
+
+### Benefits
+
+- **Scriptable**: Use in bash scripts, CI/CD, cron jobs
+- **Composable**: Chain with other commands
+- **Same tools**: Full agent capabilities in one-off mode
+- **Same behavior**: Memory, tool use, everything works the same
+
+### Example Session
+
+**One-off:**
+```bash
+$ bun nanoagent.ts "List all TypeScript files"
+
+⏺ glob(*.ts)
+  ⎿  nanoagent.ts
+
+⏺ Found 1 TypeScript file: nanoagent.ts
+
+$ echo "Done"
+Done
+```
+
+**Interactive:**
+```bash
+$ bun nanoagent.ts
+
+nanoagent
+claude-sonnet-4-5 | /tmp/demo
+
+❯ List all TypeScript files
+
+⏺ glob(*.ts)
+  ⎿  nanoagent.ts
+
+⏺ Found 1 TypeScript file: nanoagent.ts
+
+❯ /q
+```
+
+Same result, different modes.
+
 ## What We've Built
 
-Your agent is now interactive! You can:
+Your agent now has two modes:
+
+**Interactive (REPL):**
 - Type requests and get responses
 - See tool calls as they happen
 - Use commands (/q, /c)
 - Have multi-turn conversations
 - Visual feedback with colors and separators
+
+**One-Off (Automation):**
+- Run single commands from CLI
+- Use in scripts and CI/CD
+- Same capabilities, no interaction
+- Exit after completion
+
+## Real-World CI/CD Example
+
+```yaml
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+      
+      - name: Generate release notes
+        run: |
+          bun nanoagent.ts "Read CHANGELOG.md and create a GitHub release notes summary for version ${{ github.ref_name }}"
+      
+      - name: Update documentation
+        run: |
+          bun nanoagent.ts "Update README.md with the new version number and latest features"
+      
+      - name: Create release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body_path: ./release-notes.md
+```
+
+Your agent becomes part of your development workflow.
 
 ## Next Steps
 
@@ -266,7 +428,11 @@ In the next lesson, we'll add parallel tool execution so multiple tools can run 
 ---
 
 **Key Takeaways:**
-- REPLs make agents user-friendly
+- REPLs make agents user-friendly for development
+- One-off mode makes agents scriptable for automation
+- Check `process.argv[2]` for command-line prompt
+- Same agent, two modes: interactive and automated
+- Use in CI/CD, cron jobs, build scripts, anywhere
 - readline module handles interactive input
 - Commands like /q and /c improve UX
 - ANSI colors make output clearer
