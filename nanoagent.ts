@@ -46,8 +46,8 @@ type Tool = {
 // ─── TOOLS ───────────────────────────────────────────────────────────────────
 const TOOLS: Record<string, Tool> = {
   read: {
-    desc: "Read file with line numbers",
-    params: ["path"],
+    desc: "Read file with line numbers. Use offset/limit to paginate large files (0-indexed line numbers)",
+    params: ["path", "offset?", "limit?"],
     fn: async (args) => {
       const lines = (await readFile(args.path, "utf-8")).split("\n");
       const start = args.offset ?? 0;
@@ -66,22 +66,22 @@ const TOOLS: Record<string, Tool> = {
     },
   },
   edit: {
-    desc: "Replace old with new in file",
-    params: ["path", "old", "new"],
+    desc: "Replace old with new in file. Use all=true to replace all occurrences",
+    params: ["path", "old", "new", "all?"],
     fn: async (args) => {
       const content = await readFile(args.path, "utf-8");
       if (!content.includes(args.old)) return "error: old_string not found";
       const escaped = args.old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const count = (content.match(new RegExp(escaped, "g")) ?? []).length;
-      if (!args.all && count > 1) return `error: old_string appears ${count} times`;
+      if (!args.all && count > 1) return `error: old_string appears ${count} times. Use all=true to replace all`;
       const result = args.all ? content.replaceAll(args.old, args.new) : content.replace(args.old, args.new);
       await writeFile(args.path, result, "utf-8");
       return "ok";
     },
   },
   glob: {
-    desc: "Find files by pattern",
-    params: ["pat"],
+    desc: "Find files by pattern. Defaults to current directory if path not specified",
+    params: ["pat", "path?"],
     fn: async (args) => {
       const files: string[] = [];
       for await (const file of new Bun.Glob(`${args.path ?? "."}/${args.pat}`).scan()) {
@@ -91,8 +91,8 @@ const TOOLS: Record<string, Tool> = {
     },
   },
   grep: {
-    desc: "Search files for regex",
-    params: ["pat"],
+    desc: "Search files for regex. Defaults to current directory if path not specified",
+    params: ["pat", "path?"],
     fn: async (args) => {
       const pattern = new RegExp(args.pat);
       const hits: string[] = [];
@@ -133,15 +133,26 @@ async function executeTool(name: string, input: any): Promise<string> {
 }
 
 function buildToolSchema() {
-  return Object.entries(TOOLS).map(([name, { desc, params }]) => ({
-    name,
-    description: desc,
-    input_schema: {
-      type: "object",
-      properties: Object.fromEntries(params.map((p) => [p, { type: "string" }])),
-      required: params,
-    },
-  }));
+  return Object.entries(TOOLS).map(([name, { desc, params }]) => {
+    const required = params.filter(p => !p.endsWith("?")).map(p => p.replace("?", ""));
+    const allParams = params.map(p => p.replace("?", ""));
+    
+    const properties = Object.fromEntries(allParams.map((p) => {
+      if (p === "all") return [p, { type: "boolean" }];
+      if (p === "offset" || p === "limit") return [p, { type: "integer" }];
+      return [p, { type: "string" }];
+    }));
+    
+    return {
+      name,
+      description: desc,
+      input_schema: {
+        type: "object",
+        properties,
+        required,
+      },
+    };
+  });
 }
 
 // ─── MEMORY ──────────────────────────────────────────────────────────────────
