@@ -1,6 +1,6 @@
 # nanoagent
 
-A minimal interactive terminal-based coding assistant with agentic tool use. Built with TypeScript and Bun, nanoagent provides a REPL interface where Claude can read, edit, search files, and execute shell commands autonomously.
+A minimal agentic coding assistant with autonomous tool use and persistent memory. Built with TypeScript and Bun, nanoagent provides both interactive REPL and one-off command modes where Claude can read, edit, search files, and execute shell commands.
 
 ## Features
 
@@ -8,7 +8,9 @@ A minimal interactive terminal-based coding assistant with agentic tool use. Bui
 - 📁 **File Operations**: Read, write, and edit files with line numbers
 - 🔍 **Code Search**: Grep patterns and glob file matching
 - 💻 **Shell Integration**: Execute bash commands directly
+- 🧠 **Episodic Memory**: Persistent conversation history across sessions with token-based budgeting
 - 🎨 **Rich Terminal UI**: Colored output and clear tool execution feedback
+- 🔄 **Two Modes**: Interactive REPL for development, one-off mode for automation/CI/CD
 - ⚡ **Bun Runtime**: Fast TypeScript execution and standalone binary compilation
 
 ## Quick Start
@@ -27,7 +29,13 @@ git clone https://github.com/averagejoeslab/nanoagent.git
 cd nanoagent
 ```
 
-2. Set up your API key:
+2. Install dependencies:
+
+```bash
+bun install
+```
+
+3. Set up your API key:
 
 ```bash
 echo "ANTHROPIC_API_KEY=your_key_here" > .env
@@ -35,11 +43,21 @@ echo "ANTHROPIC_API_KEY=your_key_here" > .env
 
 ### Running
 
-#### Development mode (interpreted)
+#### Interactive mode (REPL)
 
 ```bash
 bun nanoagent.ts
 ```
+
+Start an interactive session with conversation history and commands.
+
+#### One-off mode (automation)
+
+```bash
+bun nanoagent.ts "Create a hello.ts file with a hello function"
+```
+
+Run a single command and exit. Perfect for scripts and CI/CD.
 
 #### Compile to standalone binary
 
@@ -50,23 +68,48 @@ bun build nanoagent.ts --compile --outfile nanoagent
 
 ## Usage
 
+### Interactive Mode
+
 Once running, you'll see the nanoagent prompt (`❯`). Simply type your coding request, and Claude will use tools autonomously to complete the task.
 
-### REPL Commands
-
+**REPL Commands:**
 - `/q` or `exit` - Quit the application
 - `/c` - Clear conversation history
 - `Enter` (empty) - Skip to next prompt
 
-### Example Session
+**Example Session:**
 
 ```
-❯ Create a hello world function in hello.ts
+nanoagent
+claude-sonnet-4-5 | /tmp/demo
+Loaded 15/50 turns (12,345 tokens)
 
-⏺ Write(hello.ts)
+────────────────────────────────────────────────────────────────────────────────
+❯ Create a hello world function in hello.ts
+────────────────────────────────────────────────────────────────────────────────
+
+⏺ write(hello.ts)
   ⎿  ok
 
-⏺ I've created a hello.ts file with a simple hello world function...
+⏺ I've created a hello.ts file with a simple hello world function
+
+────────────────────────────────────────────────────────────────────────────────
+❯ /q
+```
+
+### One-Off Mode
+
+Perfect for automation, CI/CD pipelines, and scripts:
+
+```bash
+# In a script
+bun nanoagent.ts "Update version in package.json to 2.0.0"
+
+# In CI/CD
+bun nanoagent.ts "Generate CHANGELOG.md from git log since last tag"
+
+# Chained commands
+bun nanoagent.ts "Run tests and create summary in test-results.md"
 ```
 
 ## Tool Capabilities
@@ -88,16 +131,17 @@ All tools execute with the current working directory as context.
 
 ### Single-File Design
 
-The entire application is contained in `nanoagent.ts` (~255 lines) with clear sections:
+The entire application is contained in `nanoagent.ts` (~330 lines) with clear sections:
 
-- Imports (Node.js modules for file I/O, shell execution, readline)
-- Config (API URL, model, max tokens, ANSI colors)
+- Imports (Node.js modules, tiktoken for token counting)
+- Config (API URL, model, memory budget, ANSI colors)
 - Types (Message, Tool)
 - Tools (read, write, edit, glob, grep, bash)
 - Tool execution (executeTool, buildToolSchema)
+- Memory (saveToTrace, loadTrace with token-based budgeting)
 - LLM interface (callLLM)
 - Agentic loop (agenticLoop with ReAct pattern)
-- REPL/UI (main function)
+- REPL/UI (main function with interactive and one-off modes)
 
 ### Agentic Loop
 
@@ -160,8 +204,12 @@ bun build nanoagent.ts --compile --target=linux-arm64 --outfile nanoagent-linux-
 
 ```
 nanoagent/
-├── nanoagent.ts       # Main application (single file)
+├── nanoagent.ts       # Main application (single file, ~330 lines)
+├── package.json       # Dependencies (js-tiktoken)
 ├── .env              # API key (gitignored)
+├── .nanoagent/       # Memory trace (gitignored)
+│   └── trace.jsonl   # Episodic memory
+├── lessons/          # Tutorial series (12 lessons)
 └── README.md         # This file
 ```
 
@@ -169,8 +217,7 @@ nanoagent/
 
 ### Dependencies
 
-- `@types/bun` - Bun TypeScript definitions
-- `typescript` ^5 - TypeScript compiler
+- `js-tiktoken` - Token counting for memory budgeting
 
 ### Runtime
 
@@ -184,11 +231,20 @@ Built with Bun, which provides:
 ### API Integration
 
 - **Model**: claude-sonnet-4-5
-- **Max tokens**: 8192
+- **Context window**: 200,000 tokens
+- **Max tokens**: 8,192
+- **Memory budget**: ~181,000 tokens (with safety margin)
 - **System prompt**: "Concise coding assistant. cwd: {working_directory}"
 - **Tool schema**: Auto-generated from TOOLS registry
 - **Tool execution**: Parallel when Claude returns multiple tool_use blocks
 - **Message format**: Anthropic Messages API with tool use
+
+### Memory System
+
+- **Episodic trace**: Saves all conversations to `.nanoagent/trace.jsonl`
+- **Token-based loading**: Loads recent turns that fit within memory budget
+- **Sliding window**: Older conversations excluded when budget exceeded
+- **Persistence**: Memory survives across sessions and restarts
 
 ## Error Handling
 
@@ -199,20 +255,39 @@ Built with Bun, which provides:
 
 ## Limitations
 
-- Single conversation thread (use `/c` to clear)
-- No conversation persistence between sessions
 - Tool results limited (grep: 50 matches, text previews: 60 chars)
 - Shell commands limited to 30-second execution
 - No streaming output (results display after completion)
+- Memory sliding window (very old conversations excluded when budget full)
+- No semantic search or importance filtering (yet)
+
+## Learning
+
+The `lessons/` directory contains a comprehensive 12-lesson tutorial series that builds nanoagent from zero:
+
+1. What is an AI Agent
+2. Your First LLM Call
+3. Adding One Tool
+4. Executing the Tool
+5. The Loop
+6. Adding More Tools
+7. Making it Interactive (REPL + one-off mode)
+8. Parallel Execution
+9. Clean Architecture
+10. Final Touches
+11. Episodic Memory
+12. Token Budgeting and Memory Management
+
+Each lesson is a complete guide assuming no prior knowledge.
 
 ## Contributing
 
-This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~255 lines in a single file, making it easy to understand, modify, and extend.
+This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~330 lines in a single file, making it easy to understand, modify, and extend.
 
 To add a new tool:
 
-1. Implement the function
-2. Add entry to `TOOLS` registry
+1. Implement the function in the `TOOLS` registry
+2. Define the description and parameters
 3. Claude will automatically have access
 
 ## License
