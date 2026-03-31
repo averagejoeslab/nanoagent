@@ -246,7 +246,12 @@ ${ANSI.bold}${ANSI.cyan}nanoagent${ANSI.reset}
 ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}
 `);
 
-  const messages: Message[] = [];
+  const messages: Message[] = await loadTrace();
+  
+  if (messages.length > 0) {
+    console.log(`${ANSI.dim}Restored ${messages.length / 2} turns from previous sessions${ANSI.reset}`);
+  }
+  
   const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}`;
   const separator = () => console.log(`${ANSI.dim}${"─".repeat(80)}${ANSI.reset}`);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -268,6 +273,14 @@ ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}
     
     messages.push({ role: "user", content: input });
     await agenticLoop(messages, systemPrompt);
+    
+    // Save this turn to trace
+    await saveToTrace({
+      timestamp: new Date().toISOString(),
+      user: input,
+      assistant: messages[messages.length - 1].content,
+    });
+    
     console.log();
   }
   
