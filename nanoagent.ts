@@ -123,9 +123,13 @@ const TOOLS: Record<string, Tool> = {
 
 // ─── TOOL EXECUTION ──────────────────────────────────────────────────────────
 async function executeTool(name: string, input: any): Promise<string> {
-  const tool = TOOLS[name];
-  if (!tool) return `error: unknown tool ${name}`;
-  return await tool.fn(input);
+  try {
+    const tool = TOOLS[name];
+    if (!tool) return `error: unknown tool ${name}`;
+    return await tool.fn(input);
+  } catch (err: any) {
+    return String(err);
+  }
 }
 
 function buildToolSchema() {
