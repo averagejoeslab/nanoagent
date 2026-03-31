@@ -8,6 +8,8 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { execSync } from "node:child_process";
 import * as readline from "node:readline";
+import { Tiktoken } from "js-tiktoken/lite";
+import cl100k_base from "js-tiktoken/ranks/cl100k_base";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -15,6 +17,9 @@ const MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 8192;
 const SHELL_TIMEOUT = 30000;
 const TRACE_FILE = ".nanoagent/trace.jsonl";
+const CONTEXT_WINDOW = 200000;
+const SYSTEM_PROMPT_OVERHEAD = 500;
+const MEMORY_BUDGET = CONTEXT_WINDOW - MAX_TOKENS - SYSTEM_PROMPT_OVERHEAD - 10000; // Reserve 10k for safety
 
 const ANSI = {
   reset: "\x1b[0m",
@@ -136,26 +141,61 @@ function buildToolSchema() {
 }
 
 // ─── MEMORY ──────────────────────────────────────────────────────────────────
+const tokenizer = new Tiktoken(cl100k_base);
+
+function countTokens(text: string): number {
+  return tokenizer.encode(text).length;
+}
+
 async function saveToTrace(turn: { timestamp: string; user: string; assistant: any }) {
   await mkdir(".nanoagent", { recursive: true });
   const line = JSON.stringify(turn) + "\n";
   await Bun.write(TRACE_FILE, line, { append: true });
 }
 
-async function loadTrace(): Promise<Message[]> {
+async function loadTrace(): Promise<{ messages: Message[]; stats: { total: number; loaded: number; tokens: number } }> {
   try {
     const content = await readFile(TRACE_FILE, "utf-8");
     const lines = content.trim().split("\n");
     
     const messages: Message[] = [];
-    for (const line of lines) {
-      const turn = JSON.parse(line);
-      messages.push({ role: "user", content: turn.user });
-      messages.push({ role: "assistant", content: turn.assistant });
+    let tokens = 0;
+    let loaded = 0;
+    
+    // Load from most recent backwards until budget exceeded
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const turn = JSON.parse(lines[i]);
+      
+      // Count tokens for this turn
+      const userTokens = countTokens(turn.user);
+      const assistantTokens = countTokens(JSON.stringify(turn.assistant));
+      const turnTokens = userTokens + assistantTokens;
+      
+      // Check if adding this turn would exceed budget
+      if (tokens + turnTokens > MEMORY_BUDGET) {
+        break; // Stop loading, we've hit the limit
+      }
+      
+      // Add to beginning (since we're going backwards)
+      messages.unshift({ role: "assistant", content: turn.assistant });
+      messages.unshift({ role: "user", content: turn.user });
+      tokens += turnTokens;
+      loaded++;
     }
-    return messages;
+    
+    return { 
+      messages, 
+      stats: { 
+        total: lines.length, 
+        loaded, 
+        tokens 
+      } 
+    };
   } catch {
-    return [];
+    return { 
+      messages: [], 
+      stats: { total: 0, loaded: 0, tokens: 0 } 
+    };
   }
 }
 
