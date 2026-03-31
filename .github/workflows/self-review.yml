@@ -1,0 +1,80 @@
+name: Nanoagent Self Review
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Review codebase
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          bun nanoagent.ts "Review all TypeScript files in this repository. Check for:
+          - Code quality issues
+          - Potential bugs
+          - Performance problems
+          - Missing error handling
+          - Inconsistencies with README
+          - Security concerns
+          
+          Create a detailed report in review-report.md with your findings."
+
+      - name: Check if report exists
+        id: check_report
+        run: |
+          if [ -f review-report.md ]; then
+            echo "has_report=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_report=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create issues from findings
+        if: steps.check_report.outputs.has_report == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bun nanoagent.ts "Read review-report.md and for each distinct issue found, create a GitHub issue using the bash tool with 'gh issue create' command. Format each issue with:
+          - Clear title prefixed with [Nanoagent Review]
+          - Detailed description from the report
+          - Appropriate labels (bug, enhancement, documentation, etc.)
+          
+          Skip creating issues if no problems were found."
+
+      - name: Upload review report
+        if: steps.check_report.outputs.has_report == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-review-report
+          path: review-report.md
+          retention-days: 30
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.check_report.outputs.has_report == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bun nanoagent.ts "Read review-report.md and create a concise summary of the findings. Then use bash tool to post it as a PR comment using:
+          gh pr comment ${{ github.event.pull_request.number }} --body '<summary here>'"

@@ -131,7 +131,7 @@ All tools execute with the current working directory as context.
 
 ### Single-File Design
 
-The entire application is contained in `nanoagent.ts` (~330 lines) with clear sections:
+The entire application is contained in `nanoagent.ts` (~356 lines) with clear sections:
 
 - Imports (Node.js modules, tiktoken for token counting)
 - Config (API URL, model, memory budget, ANSI colors)
@@ -204,7 +204,7 @@ bun build nanoagent.ts --compile --target=linux-arm64 --outfile nanoagent-linux-
 
 ```
 nanoagent/
-├── nanoagent.ts       # Main application (single file, ~330 lines)
+├── nanoagent.ts       # Main application (single file, ~356 lines)
 ├── package.json       # Dependencies (js-tiktoken)
 ├── .env              # API key (gitignored)
 ├── .nanoagent/       # Memory trace (gitignored)
@@ -282,7 +282,7 @@ Each lesson is a complete guide assuming no prior knowledge.
 
 ## Contributing
 
-This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~330 lines in a single file, making it easy to understand, modify, and extend.
+This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~356 lines in a single file, making it easy to understand, modify, and extend.
 
 To add a new tool:
 
