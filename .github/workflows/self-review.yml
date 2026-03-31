@@ -31,6 +31,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" > .env
+          echo "Key length: ${#ANTHROPIC_API_KEY}"
+          echo "Key starts with: ${ANTHROPIC_API_KEY:0:15}"
           bun nanoagent.ts "Review all TypeScript files in this repository. Check for:
           - Code quality issues
           - Potential bugs
