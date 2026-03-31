@@ -1,13 +1,19 @@
 #!/usr/bin/env bun
 /**
- * nanoagent - minimal deep agent in TypeScript
+ * nanoagent - minimal agentic coding assistant
+ * Demonstrates the ReAct pattern: Reason → Act → Observe → Repeat
  */
+
+// ─── IMPORTS ─────────────────────────────────────────────────────────────────
 import { readFile, writeFile } from "node:fs/promises";
 import { execSync } from "node:child_process";
 import * as readline from "node:readline";
 
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-5";
+const MAX_TOKENS = 8192;
+const SHELL_TIMEOUT = 30000;
 
 const ANSI = {
   reset: "\x1b[0m",
@@ -19,8 +25,20 @@ const ANSI = {
   red: "\x1b[31m",
 };
 
-// --- Tool implementations ---
-const TOOLS: Record<string, { desc: string; params: string[]; fn: (args: any) => Promise<string> | string }> = {
+// ─── TYPES ───────────────────────────────────────────────────────────────────
+type Message = {
+  role: "user" | "assistant";
+  content: string | any[];
+};
+
+type Tool = {
+  desc: string;
+  params: string[];
+  fn: (args: any) => Promise<string> | string;
+};
+
+// ─── TOOLS ───────────────────────────────────────────────────────────────────
+const TOOLS: Record<string, Tool> = {
   read: {
     desc: "Read file with line numbers",
     params: ["path"],
@@ -28,7 +46,9 @@ const TOOLS: Record<string, { desc: string; params: string[]; fn: (args: any) =>
       const lines = (await readFile(args.path, "utf-8")).split("\n");
       const start = args.offset ?? 0;
       const end = start + (args.limit ?? lines.length);
-      return lines.slice(start, end).map((line, i) => `${String(start + i + 1).padStart(4)}| ${line}`).join("\n");
+      return lines.slice(start, end).map((line, i) => 
+        `${String(start + i + 1).padStart(4)}| ${line}`
+      ).join("\n");
     },
   },
   write: {
@@ -87,7 +107,7 @@ const TOOLS: Record<string, { desc: string; params: string[]; fn: (args: any) =>
     params: ["cmd"],
     fn: (args) => {
       try {
-        return execSync(args.cmd, { encoding: "utf-8", timeout: 30000 }).trim() || "(empty)";
+        return execSync(args.cmd, { encoding: "utf-8", timeout: SHELL_TIMEOUT }).trim() || "(empty)";
       } catch (err: any) {
         return (err.stdout || err.stderr || String(err)).trim();
       }
@@ -95,7 +115,13 @@ const TOOLS: Record<string, { desc: string; params: string[]; fn: (args: any) =>
   },
 };
 
-// --- API ---
+// ─── TOOL EXECUTION ──────────────────────────────────────────────────────────
+async function executeTool(name: string, input: any): Promise<string> {
+  const tool = TOOLS[name];
+  if (!tool) return `error: unknown tool ${name}`;
+  return await tool.fn(input);
+}
+
 function buildToolSchema() {
   return Object.entries(TOOLS).map(([name, { desc, params }]) => ({
     name,
@@ -108,7 +134,8 @@ function buildToolSchema() {
   }));
 }
 
-async function callAPI(messages: any[], systemPrompt: string) {
+// ─── LLM INTERFACE ───────────────────────────────────────────────────────────
+async function callLLM(messages: Message[], systemPrompt: string) {
   const response = await fetch(API_URL, {
     method: "POST",
     headers: {
@@ -118,7 +145,7 @@ async function callAPI(messages: any[], systemPrompt: string) {
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 8192,
+      max_tokens: MAX_TOKENS,
       system: systemPrompt,
       messages,
       tools: buildToolSchema(),
@@ -128,14 +155,61 @@ async function callAPI(messages: any[], systemPrompt: string) {
   return response.json();
 }
 
-// --- Main ---
+// ─── AGENTIC LOOP ────────────────────────────────────────────────────────────
+/**
+ * The ReAct Pattern:
+ * 1. REASON: LLM decides what to do based on context
+ * 2. ACT: LLM calls tools to take action
+ * 3. OBSERVE: Tool results are added to context
+ * 4. REPEAT: Loop continues until LLM responds without tools
+ */
+async function agenticLoop(messages: Message[], systemPrompt: string): Promise<void> {
+  while (true) {
+    // REASON: Ask LLM what to do next
+    const response = await callLLM(messages, systemPrompt);
+    
+    // Check for text output
+    const textBlocks = response.content.filter((b: any) => b.type === "text");
+    for (const block of textBlocks) {
+      console.log(`\n${ANSI.cyan}⏺${ANSI.reset} ${block.text}`);
+    }
+    
+    // ACT: Execute any tool calls
+    const toolCalls = response.content.filter((b: any) => b.type === "tool_use");
+    const toolResults: any[] = [];
+    
+    for (const call of toolCalls) {
+      const preview = String(Object.values(call.input)[0] ?? "").slice(0, 50);
+      console.log(`\n${ANSI.green}⏺ ${call.name}${ANSI.reset}(${ANSI.dim}${preview}${ANSI.reset})`);
+      
+      const result = await executeTool(call.name, call.input);
+      
+      const lines = result.split("\n");
+      const resultPreview = lines[0].slice(0, 60) + (lines.length > 1 ? ` +${lines.length - 1} lines` : "");
+      console.log(`  ${ANSI.dim}⎿  ${resultPreview}${ANSI.reset}`);
+      
+      toolResults.push({ type: "tool_result", tool_use_id: call.id, content: result });
+    }
+    
+    // Add assistant response to conversation
+    messages.push({ role: "assistant", content: response.content });
+    
+    // OBSERVE: If no tools were called, agent is done
+    if (toolResults.length === 0) break;
+    
+    // REPEAT: Feed tool results back to LLM
+    messages.push({ role: "user", content: toolResults });
+  }
+}
+
+// ─── REPL / UI ───────────────────────────────────────────────────────────────
 async function main() {
   console.log(`
 ${ANSI.bold}${ANSI.cyan}nanoagent${ANSI.reset}
 ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}
 `);
 
-  const messages: any[] = [];
+  const messages: Message[] = [];
   const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}`;
   const separator = () => console.log(`${ANSI.dim}${"─".repeat(80)}${ANSI.reset}`);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -146,6 +220,7 @@ ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}
       rl.question(`${ANSI.bold}${ANSI.blue}❯${ANSI.reset} `, (answer) => resolve(answer.trim()));
     });
     separator();
+    
     if (!input) continue;
     if (input === "/q" || input === "exit") break;
     if (input === "/c") {
@@ -153,33 +228,16 @@ ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}
       console.log(`${ANSI.green}⏺ Cleared conversation${ANSI.reset}`);
       continue;
     }
+    
     messages.push({ role: "user", content: input });
-
-    // Agentic loop
-    while (true) {
-      const response = await callAPI(messages, systemPrompt);
-      const toolResults: any[] = [];
-      for (const block of response.content) {
-        if (block.type === "text") {
-          console.log(`\n${ANSI.cyan}⏺${ANSI.reset} ${block.text}`);
-        } else if (block.type === "tool_use") {
-          const preview = String(Object.values(block.input)[0] ?? "").slice(0, 50);
-          console.log(`\n${ANSI.green}⏺ ${block.name}${ANSI.reset}(${ANSI.dim}${preview}${ANSI.reset})`);
-          const tool = TOOLS[block.name];
-          const result = tool ? await tool.fn(block.input) : `error: unknown tool ${block.name}`;
-          const lines = result.split("\n");
-          const resultPreview = lines[0].slice(0, 60) + (lines.length > 1 ? ` +${lines.length - 1} lines` : "");
-          console.log(`  ${ANSI.dim}⎿  ${resultPreview}${ANSI.reset}`);
-          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
-        }
-      }
-      messages.push({ role: "assistant", content: response.content });
-      if (toolResults.length === 0) break;
-      messages.push({ role: "user", content: toolResults });
-    }
+    await agenticLoop(messages, systemPrompt);
     console.log();
   }
+  
   rl.close();
 }
 
-main().catch((e) => { console.error(`${ANSI.red}Fatal: ${e}${ANSI.reset}`); process.exit(1); });
+main().catch((e) => {
+  console.error(`${ANSI.red}Fatal: ${e}${ANSI.reset}`);
+  process.exit(1);
+});
