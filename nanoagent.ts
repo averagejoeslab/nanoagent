@@ -174,21 +174,33 @@ async function agenticLoop(messages: Message[], systemPrompt: string): Promise<v
       console.log(`\n${ANSI.cyan}⏺${ANSI.reset} ${block.text}`);
     }
     
-    // ACT: Execute any tool calls
+    // ACT: Execute any tool calls (in parallel when multiple)
     const toolCalls = response.content.filter((b: any) => b.type === "tool_use");
     const toolResults: any[] = [];
     
-    for (const call of toolCalls) {
-      const preview = String(Object.values(call.input)[0] ?? "").slice(0, 50);
-      console.log(`\n${ANSI.green}⏺ ${call.name}${ANSI.reset}(${ANSI.dim}${preview}${ANSI.reset})`);
+    if (toolCalls.length > 0) {
+      // Display what tools are being called
+      for (const call of toolCalls) {
+        const preview = String(Object.values(call.input)[0] ?? "").slice(0, 50);
+        console.log(`\n${ANSI.green}⏺ ${call.name}${ANSI.reset}(${ANSI.dim}${preview}${ANSI.reset})`);
+      }
       
-      const result = await executeTool(call.name, call.input);
+      // Execute all tools in parallel
+      const results = await Promise.all(
+        toolCalls.map(call => executeTool(call.name, call.input))
+      );
       
-      const lines = result.split("\n");
-      const resultPreview = lines[0].slice(0, 60) + (lines.length > 1 ? ` +${lines.length - 1} lines` : "");
-      console.log(`  ${ANSI.dim}⎿  ${resultPreview}${ANSI.reset}`);
-      
-      toolResults.push({ type: "tool_result", tool_use_id: call.id, content: result });
+      // Display results and build tool_result blocks
+      for (let i = 0; i < toolCalls.length; i++) {
+        const call = toolCalls[i];
+        const result = results[i];
+        
+        const lines = result.split("\n");
+        const resultPreview = lines[0].slice(0, 60) + (lines.length > 1 ? ` +${lines.length - 1} lines` : "");
+        console.log(`  ${ANSI.dim}⎿  ${resultPreview}${ANSI.reset}`);
+        
+        toolResults.push({ type: "tool_result", tool_use_id: call.id, content: result });
+      }
     }
     
     // Add assistant response to conversation
