@@ -74,7 +74,7 @@ const TOOLS: Record<string, Tool> = {
       const escaped = args.old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const count = (content.match(new RegExp(escaped, "g")) ?? []).length;
       if (!args.all && count > 1) return `error: old_string appears ${count} times`;
-      const result = args.all ? content.split(args.old).join(args.new) : content.replace(args.old, args.new);
+      const result = args.all ? content.replaceAll(args.old, args.new) : content.replace(args.old, args.new);
       await writeFile(args.path, result, "utf-8");
       return "ok";
     },
