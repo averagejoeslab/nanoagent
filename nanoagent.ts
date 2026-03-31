@@ -286,10 +286,13 @@ ${ANSI.bold}${ANSI.cyan}nanoagent${ANSI.reset}
 ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}
 `);
 
-  const messages: Message[] = await loadTrace();
+  const { messages, stats } = await loadTrace();
   
-  if (messages.length > 0) {
-    console.log(`${ANSI.dim}Restored ${messages.length / 2} turns from previous sessions${ANSI.reset}`);
+  if (stats.loaded > 0) {
+    console.log(`${ANSI.dim}Loaded ${stats.loaded}/${stats.total} turns (${stats.tokens.toLocaleString()} tokens)${ANSI.reset}`);
+    if (stats.loaded < stats.total) {
+      console.log(`${ANSI.dim}${stats.total - stats.loaded} older turns excluded to stay within memory budget${ANSI.reset}`);
+    }
   }
   
   const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}`;
