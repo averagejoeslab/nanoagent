@@ -55,17 +55,20 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          bun nanoagent.ts "First, use bash tool to run 'gh issue list --state open --json title,body --limit 100' to get existing open issues.
+          bun nanoagent.ts "First, use bash tool to run 'gh issue list --state open --json number,title,body --limit 100' to get existing open issues.
           
           Then read review-report.md and for each distinct issue found:
           1. Check if a similar issue already exists (compare titles and content)
-          2. If a similar issue exists, skip creating it
+          2. If a similar issue exists:
+             - Check if the new finding contains additional information not in the existing issue
+             - If yes, add a comment to the existing issue using 'gh issue comment <number> --body <new info>'
+             - If no new info, skip it
           3. If no similar issue exists, create a new GitHub issue using 'gh issue create' with:
              - Clear title prefixed with [Nanoagent Review]
              - Detailed description from the report
              - Appropriate labels (bug, enhancement, documentation, etc.)
           
-          At the end, report how many issues were created vs skipped as duplicates.
+          At the end, report stats: created, updated, skipped.
           Skip creating issues if no problems were found."
 
       - name: Upload review report
