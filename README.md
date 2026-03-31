@@ -88,26 +88,28 @@ All tools execute with the current working directory as context.
 
 ### Single-File Design
 
-The entire application is contained in `nanoagent.ts` with clear sections:
+The entire application is contained in `nanoagent.ts` (~255 lines) with clear sections:
 
-- Constants (API URL, model, ANSI colors)
-- Type definitions (TypeScript interfaces)
-- Tool implementations (six file/system tools)
-- Tool registry (centralized metadata)
-- Helper functions (API calls, formatting)
-- Main REPL (interactive loop)
+- Imports (Node.js modules for file I/O, shell execution, readline)
+- Config (API URL, model, max tokens, ANSI colors)
+- Types (Message, Tool)
+- Tools (read, write, edit, glob, grep, bash)
+- Tool execution (executeTool, buildToolSchema)
+- LLM interface (callLLM)
+- Agentic loop (agenticLoop with ReAct pattern)
+- REPL/UI (main function)
 
 ### Agentic Loop
 
-The core pattern:
+The ReAct pattern (Reason → Act → Observe → Repeat):
 
-1. User provides request
-2. Claude responds with text and/or tool calls
-3. Tools execute and results are returned to Claude
-4. Loop continues until Claude responds without tools
+1. **REASON**: User provides request, Claude decides what to do
+2. **ACT**: Claude responds with text and/or tool calls (executed in parallel when multiple)
+3. **OBSERVE**: Tool results are added to context
+4. **REPEAT**: Loop continues until Claude responds without tools
 5. Task complete ✅
 
-This allows Claude to chain multiple operations autonomously (e.g., read file → analyze → edit file → verify).
+Claude orchestrates the sequence. If it returns multiple tool calls in one response, they execute in parallel. If it needs sequential execution, it returns one tool at a time across multiple loop iterations.
 
 ## Configuration
 
@@ -181,9 +183,11 @@ Built with Bun, which provides:
 
 ### API Integration
 
+- **Model**: claude-sonnet-4-5
 - **Max tokens**: 8192
-- **System prompt**: Includes current working directory
-- **Tool schema**: Auto-generated from tool registry
+- **System prompt**: "Concise coding assistant. cwd: {working_directory}"
+- **Tool schema**: Auto-generated from TOOLS registry
+- **Tool execution**: Parallel when Claude returns multiple tool_use blocks
 - **Message format**: Anthropic Messages API with tool use
 
 ## Error Handling
@@ -203,7 +207,7 @@ Built with Bun, which provides:
 
 ## Contributing
 
-This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~200 lines in a single file, making it easy to understand, modify, and extend.
+This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~255 lines in a single file, making it easy to understand, modify, and extend.
 
 To add a new tool:
 
