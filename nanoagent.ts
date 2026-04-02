@@ -6,7 +6,8 @@
 
 // ─── IMPORTS ─────────────────────────────────────────────────────────────────
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import * as readline from "node:readline";
 import { Tiktoken } from "js-tiktoken/lite";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
@@ -20,6 +21,12 @@ const TRACE_FILE = ".nanoagent/trace.jsonl";
 const CONTEXT_WINDOW = 200000;
 const SYSTEM_PROMPT_OVERHEAD = 500;
 const MEMORY_BUDGET = CONTEXT_WINDOW - MAX_TOKENS - SYSTEM_PROMPT_OVERHEAD - 10000; // Reserve 10k for safety
+
+// Sandbox configuration
+const USE_SANDBOX = process.env.SANDBOX !== "false"; // Enabled by default
+const SANDBOX_MEMORY = "512m";
+const SANDBOX_CPUS = "1.0";
+const SANDBOX_PIDS = 100;
 
 const ANSI = {
   reset: "\x1b[0m",
@@ -42,6 +49,177 @@ type Tool = {
   params: string[];
   fn: (args: any) => Promise<string> | string;
 };
+
+type ExecResult = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  timedOut: boolean;
+};
+
+// ─── SANDBOX RUNTIME ─────────────────────────────────────────────────────────
+class Sandbox {
+  private containerId: string | null = null;
+  private isRunning: boolean = false;
+
+  async start(): Promise<void> {
+    if (this.isRunning) return;
+
+    const name = `nanoagent-sandbox-${randomBytes(8).toString("hex")}`;
+    const cwd = process.cwd();
+
+    // Build sandbox image if not exists
+    try {
+      execSync("docker image inspect nanoagent-sandbox", { stdio: "ignore" });
+    } catch {
+      console.log(`${ANSI.cyan}Building sandbox image...${ANSI.reset}`);
+      execSync("docker build -f Dockerfile.sandbox -t nanoagent-sandbox .", {
+        cwd,
+        stdio: "inherit",
+      });
+    }
+
+    const dockerArgs = [
+      "run", "-d", "--rm", "--name", name,
+      // Security
+      "--cap-drop", "ALL",
+      "--security-opt", "no-new-privileges",
+      "--security-opt", "seccomp=default",
+      "--network", "none",
+      // Filesystem
+      "--read-only",
+      "--tmpfs", "/tmp:rw,noexec,nosuid,size=100m",
+      "--tmpfs", "/workspace:rw,size=500m",
+      "-v", `${cwd}:/mnt/host:ro`,
+      "-w", "/workspace",
+      // Resources
+      "--memory", SANDBOX_MEMORY,
+      "--memory-swap", SANDBOX_MEMORY,
+      "--cpus", SANDBOX_CPUS,
+      "--pids-limit", SANDBOX_PIDS.toString(),
+      "nanoagent-sandbox",
+    ];
+
+    try {
+      this.containerId = execSync(dockerArgs.join(" "), {
+        encoding: "utf-8",
+        timeout: 10000,
+      }).trim();
+      this.isRunning = true;
+    } catch (error: any) {
+      throw new Error(`Failed to start sandbox: ${error.message}`);
+    }
+  }
+
+  async exec(command: string, timeout = SHELL_TIMEOUT): Promise<ExecResult> {
+    if (!this.isRunning || !this.containerId) {
+      throw new Error("Sandbox not running");
+    }
+
+    return new Promise((resolve) => {
+      let stdout = "";
+      let stderr = "";
+      let timedOut = false;
+
+      const proc = spawn("docker", ["exec", this.containerId!, "bash", "-c", command]);
+
+      const timer = setTimeout(() => {
+        timedOut = true;
+        proc.kill("SIGKILL");
+      }, timeout);
+
+      proc.stdout.on("data", (data) => (stdout += data.toString()));
+      proc.stderr.on("data", (data) => (stderr += data.toString()));
+
+      proc.on("close", (code) => {
+        clearTimeout(timer);
+        resolve({
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+          exitCode: code ?? -1,
+          timedOut,
+        });
+      });
+
+      proc.on("error", (error) => {
+        clearTimeout(timer);
+        resolve({
+          stdout: stdout.trim(),
+          stderr: error.message,
+          exitCode: -1,
+          timedOut,
+        });
+      });
+    });
+  }
+
+  async stop(): Promise<void> {
+    if (!this.isRunning || !this.containerId) return;
+
+    try {
+      execSync(`docker stop ${this.containerId}`, {
+        stdio: "ignore",
+        timeout: 5000,
+      });
+    } catch {
+      try {
+        execSync(`docker rm -f ${this.containerId}`, { stdio: "ignore" });
+      } catch {}
+    }
+
+    this.isRunning = false;
+    this.containerId = null;
+  }
+
+  async health(): Promise<boolean> {
+    if (!this.containerId) return false;
+
+    try {
+      const result = execSync(`docker inspect -f '{{.State.Running}}' ${this.containerId}`, {
+        encoding: "utf-8",
+        timeout: 1000,
+      }).trim();
+      return result === "true";
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Singleton sandbox instance for session persistence
+let globalSandbox: Sandbox | null = null;
+
+async function getSandbox(): Promise<Sandbox> {
+  if (!USE_SANDBOX) {
+    throw new Error("Sandbox disabled");
+  }
+
+  if (!globalSandbox) {
+    globalSandbox = new Sandbox();
+    await globalSandbox.start();
+
+    // Cleanup on exit
+    process.on("exit", () => globalSandbox?.stop());
+    process.on("SIGINT", async () => {
+      await globalSandbox?.stop();
+      process.exit(0);
+    });
+    process.on("SIGTERM", async () => {
+      await globalSandbox?.stop();
+      process.exit(0);
+    });
+  }
+
+  // Verify sandbox is still healthy
+  const healthy = await globalSandbox.health();
+  if (!healthy) {
+    await globalSandbox.stop();
+    globalSandbox = new Sandbox();
+    await globalSandbox.start();
+  }
+
+  return globalSandbox;
+}
 
 // ─── TOOLS ───────────────────────────────────────────────────────────────────
 const TOOLS: Record<string, Tool> = {
@@ -109,9 +287,29 @@ const TOOLS: Record<string, Tool> = {
     },
   },
   bash: {
-    desc: "Run shell command",
+    desc: "Run shell command (sandboxed)",
     params: ["cmd"],
-    fn: (args) => {
+    fn: async (args) => {
+      if (USE_SANDBOX) {
+        try {
+          const sandbox = await getSandbox();
+          const result = await sandbox.exec(args.cmd);
+
+          if (result.timedOut) {
+            return `error: command timed out after ${SHELL_TIMEOUT}ms`;
+          }
+
+          if (result.exitCode !== 0) {
+            return result.stderr || result.stdout || `error: exit code ${result.exitCode}`;
+          }
+
+          return result.stdout || "(empty)";
+        } catch (err: any) {
+          return `error: ${err.message}`;
+        }
+      }
+
+      // Fallback to host execution (not recommended)
       try {
         return execSync(args.cmd, { encoding: "utf-8", timeout: SHELL_TIMEOUT }).trim() || "(empty)";
       } catch (err: any) {
@@ -308,7 +506,7 @@ async function main() {
   // One-off mode: run single prompt and exit
   if (oneOffPrompt) {
     const { messages } = await loadTrace();
-    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}`;
+    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}${USE_SANDBOX ? "\n\nSECURITY: bash commands run in sandboxed Docker container (no network, read-only host files, 512MB RAM, 1 CPU)." : ""}`;
     
     messages.push({ role: "user", content: oneOffPrompt });
     await agenticLoop(messages, systemPrompt);
@@ -324,8 +522,8 @@ async function main() {
   
   // Interactive REPL mode
   console.log(`
-${ANSI.bold}${ANSI.cyan}nanoagent${ANSI.reset}
-${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}
+${ANSI.bold}${ANSI.cyan}nanoagent${USE_SANDBOX ? " 🐳" : ""}${ANSI.reset}
+${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}${USE_SANDBOX ? ` | ${ANSI.green}sandboxed${ANSI.reset}` : ""}
 `);
 
   const { messages, stats } = await loadTrace();
@@ -370,6 +568,12 @@ ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}
   }
   
   rl.close();
+  
+  // Cleanup sandbox
+  if (globalSandbox) {
+    console.log(`${ANSI.dim}Stopping sandbox...${ANSI.reset}`);
+    await globalSandbox.stop();
+  }
 }
 
 main().catch((e) => {

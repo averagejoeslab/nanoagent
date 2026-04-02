@@ -8,6 +8,7 @@ A minimal agentic coding assistant with autonomous tool use and persistent memor
 - 📁 **File Operations**: Read, write, and edit files with line numbers
 - 🔍 **Code Search**: Grep patterns and glob file matching
 - 💻 **Shell Integration**: Execute bash commands directly
+- 🐳 **Docker Sandboxing**: Production-grade isolation for bash commands (filesystem, network, resource limits)
 - 🧠 **Episodic Memory**: Persistent conversation history across sessions with token-based budgeting
 - 🎨 **Rich Terminal UI**: Colored output and clear tool execution feedback
 - 🔄 **Two Modes**: Interactive REPL for development, one-off mode for automation/CI/CD
@@ -18,6 +19,7 @@ A minimal agentic coding assistant with autonomous tool use and persistent memor
 ### Prerequisites
 
 - [Bun](https://bun.sh) v1.3.4 or later
+- [Docker](https://www.docker.com/) (for sandboxed execution)
 - Anthropic API key
 
 ### Installation
@@ -41,6 +43,14 @@ bun install
 echo "ANTHROPIC_API_KEY=your_key_here" > .env
 ```
 
+4. Build the sandbox image:
+
+```bash
+docker build -f Dockerfile.sandbox -t nanoagent-sandbox .
+```
+
+The sandbox provides secure isolation for bash commands with filesystem restrictions, no network access, and resource limits.
+
 ### Running
 
 #### Interactive mode (REPL)
@@ -49,7 +59,7 @@ echo "ANTHROPIC_API_KEY=your_key_here" > .env
 bun nanoagent.ts
 ```
 
-Start an interactive session with conversation history and commands.
+Start an interactive session with conversation history and commands. Bash commands run in a sandboxed Docker container by default (look for the 🐳 emoji).
 
 #### One-off mode (automation)
 
@@ -80,8 +90,8 @@ Once running, you'll see the nanoagent prompt (`❯`). Simply type your coding r
 **Example Session:**
 
 ```
-nanoagent
-claude-sonnet-4-5 | /tmp/demo
+nanoagent 🐳
+claude-sonnet-4-5 | /tmp/demo | sandboxed
 Loaded 15/50 turns (12,345 tokens)
 
 ────────────────────────────────────────────────────────────────────────────────
@@ -116,26 +126,57 @@ bun nanoagent.ts "Run tests and create summary in test-results.md"
 
 nanoagent provides Claude with six powerful tools:
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `read` | Read file with line numbers | `path`, `offset?`, `limit?` |
-| `write` | Write content to file | `path`, `content` |
-| `edit` | Replace text in file | `path`, `old`, `new`, `all?` |
-| `glob` | Find files by pattern | `pat`, `path?` |
-| `grep` | Search files with regex | `pat`, `path?` |
-| `bash` | Execute shell commands | `cmd` |
+| Tool | Description | Parameters | Sandboxed |
+|------|-------------|------------|-----------|
+| `read` | Read file with line numbers | `path`, `offset?`, `limit?` | No |
+| `write` | Write content to file | `path`, `content` | No |
+| `edit` | Replace text in file | `path`, `old`, `new`, `all?` | No |
+| `glob` | Find files by pattern | `pat`, `path?` | No |
+| `grep` | Search files with regex | `pat`, `path?` | No |
+| `bash` | Execute shell commands (sandboxed) | `cmd` | Yes 🐳 |
 
-All tools execute with the current working directory as context.
+All tools execute with the current working directory as context. The `bash` tool runs in an isolated Docker container by default for security.
+
+## Security & Sandboxing
+
+nanoagent uses **production-grade Docker sandboxing** for bash command execution, providing industry-standard security isolation:
+
+### Security Features
+
+- **Filesystem Isolation**: Read-only host filesystem, limited writable tmpfs
+- **Network Isolation**: No network access (`--network none`)
+- **Resource Limits**: 512MB RAM, 1 CPU core, 100 process limit
+- **Capability Dropping**: All Linux capabilities removed
+- **Seccomp Profile**: Syscall filtering enabled
+
+This prevents:
+- Access to sensitive files (~/.ssh, ~/.aws, .env)
+- Network exfiltration
+- Resource exhaustion
+- Privilege escalation
+
+### Disabling Sandbox
+
+For development or trusted environments:
+
+```bash
+SANDBOX=false bun nanoagent.ts
+```
+
+**⚠️ Warning**: Running without sandbox allows direct host access. Only disable for trusted prompts.
+
+See [SANDBOX.md](SANDBOX.md) for complete documentation and security model details.
 
 ## Architecture
 
 ### Single-File Design
 
-The entire application is contained in `nanoagent.ts` (~356 lines) with clear sections:
+The entire application is contained in `nanoagent.ts` (~530 lines) with clear sections:
 
 - Imports (Node.js modules, tiktoken for token counting)
-- Config (API URL, model, memory budget, ANSI colors)
-- Types (Message, Tool)
+- Config (API URL, model, memory budget, ANSI colors, sandbox settings)
+- Types (Message, Tool, ExecResult)
+- Sandbox Runtime (Docker container lifecycle management)
 - Tools (read, write, edit, glob, grep, bash)
 - Tool execution (executeTool, buildToolSchema)
 - Memory (saveToTrace, loadTrace with token-based budgeting)
@@ -178,6 +219,7 @@ https://api.anthropic.com/v1/messages
 ### Environment Variables
 
 - `ANTHROPIC_API_KEY` (required) - Your Anthropic API key
+- `SANDBOX` (optional) - Set to `false` to disable sandboxing
 
 ## Development
 
@@ -204,13 +246,15 @@ bun build nanoagent.ts --compile --target=linux-arm64 --outfile nanoagent-linux-
 
 ```
 nanoagent/
-├── nanoagent.ts       # Main application (single file, ~356 lines)
-├── package.json       # Dependencies (js-tiktoken)
-├── .env              # API key (gitignored)
-├── .nanoagent/       # Memory trace (gitignored)
-│   └── trace.jsonl   # Episodic memory
-├── lessons/          # Tutorial series (12 lessons)
-└── README.md         # This file
+├── nanoagent.ts         # Main application (single file, ~530 lines)
+├── Dockerfile.sandbox   # Docker sandbox image definition
+├── package.json         # Dependencies (js-tiktoken)
+├── .env                # API key (gitignored)
+├── .nanoagent/         # Memory trace (gitignored)
+│   └── trace.jsonl     # Episodic memory
+├── lessons/            # Tutorial series (13 lessons)
+├── SANDBOX.md          # Sandbox documentation
+└── README.md           # This file
 ```
 
 ## Technical Details
@@ -263,7 +307,7 @@ Built with Bun, which provides:
 
 ## Learning
 
-The `lessons/` directory contains a comprehensive 12-lesson tutorial series that builds nanoagent from zero:
+The `lessons/` directory contains a comprehensive 13-lesson tutorial series that builds nanoagent from zero:
 
 1. What is an AI Agent
 2. Your First LLM Call
@@ -277,12 +321,13 @@ The `lessons/` directory contains a comprehensive 12-lesson tutorial series that
 10. Final Touches
 11. Episodic Memory
 12. Token Budgeting and Memory Management
+13. Production Sandboxing
 
 Each lesson is a complete guide assuming no prior knowledge.
 
 ## Contributing
 
-This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~356 lines in a single file, making it easy to understand, modify, and extend.
+This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~530 lines in a single file, making it easy to understand, modify, and extend.
 
 To add a new tool:
 
