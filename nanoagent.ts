@@ -296,6 +296,13 @@ async function agenticLoop(messages: Message[], systemPrompt: string): Promise<v
 
 // ─── REPL / UI ───────────────────────────────────────────────────────────────
 async function main() {
+  // Validate API key early
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error(`${ANSI.red}Error: ANTHROPIC_API_KEY not set${ANSI.reset}`);
+    console.error(`${ANSI.dim}Set it in .env file or environment${ANSI.reset}`);
+    process.exit(1);
+  }
+  
   const oneOffPrompt = process.argv[2];
   
   // One-off mode: run single prompt and exit
