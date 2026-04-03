@@ -608,12 +608,13 @@ ${ANSI.bold}${ANSI.cyan}nanoagent${USE_SANDBOX ? " 🐳" : ""}${ANSI.reset}
 ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}${USE_SANDBOX ? ` | ${ANSI.green}sandboxed${ANSI.reset}` : ""}
 `);
 
-  const { messages, stats } = await loadTrace();
+  // Load initial state to show stats
+  const initialLoad = await loadTrace();
   
-  if (stats.loaded > 0) {
-    console.log(`${ANSI.dim}Loaded ${stats.loaded}/${stats.total} turns (${stats.tokens.toLocaleString()} tokens)${ANSI.reset}`);
-    if (stats.loaded < stats.total) {
-      console.log(`${ANSI.dim}${stats.total - stats.loaded} older turns excluded to stay within memory budget${ANSI.reset}`);
+  if (initialLoad.stats.loaded > 0) {
+    console.log(`${ANSI.dim}Loaded ${initialLoad.stats.loaded}/${initialLoad.stats.total} turns (${initialLoad.stats.tokens.toLocaleString()} tokens)${ANSI.reset}`);
+    if (initialLoad.stats.loaded < initialLoad.stats.total) {
+      console.log(`${ANSI.dim}${initialLoad.stats.total - initialLoad.stats.loaded} older turns excluded to stay within memory budget${ANSI.reset}`);
     }
   }
   
@@ -631,15 +632,23 @@ ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}${USE
     if (!input) continue;
     if (input === "/q" || input === "exit") break;
     if (input === "/c") {
-      messages.length = 0;
-      console.log(`${ANSI.green}⏺ Cleared conversation${ANSI.reset}`);
+      // Clear by deleting the trace file
+      try {
+        await Bun.write(TRACE_FILE, "");
+        console.log(`${ANSI.green}⏺ Cleared conversation${ANSI.reset}`);
+      } catch {
+        console.log(`${ANSI.green}⏺ Cleared conversation (no history)${ANSI.reset}`);
+      }
       continue;
     }
+    
+    // Recompute working buffer from episodic trace on every turn
+    const { messages } = await loadTrace();
     
     messages.push({ role: "user", content: input });
     await agenticLoop(messages, systemPrompt);
     
-    // Save this turn to trace
+    // Save this turn to trace (episodic memory)
     await saveToTrace({
       timestamp: new Date().toISOString(),
       user: input,
