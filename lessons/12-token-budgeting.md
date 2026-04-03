@@ -8,7 +8,9 @@ If you've been using your agent extensively since Lesson 11, you've probably not
 - Higher API costs
 - Maybe even errors: "context length exceeded"
 
-Let's understand why.
+**This happens to ALL agents, regardless of domain.** Let's understand why and fix it.
+
+**The solution is universal** - works the same for coding agents, support agents, analytics agents, and DevOps agents.
 
 ## What Are Tokens?
 
@@ -231,15 +233,34 @@ At this point, you're operating in a **fixed-size sliding window**.
 
 For many use cases, yes!
 
-**Works well when:**
-- Most work is short-term
-- Recent context is what matters
-- You don't need ancient history
+**Works well across all domains when:**
 
-**Limitations:**
+**Coding Agent:**
+- Most work is in current project
+- Recent file changes matter most
+- Old refactorings less relevant
+
+**Support Agent:**
+- Recent tickets more important
+- Old resolved tickets less critical
+- Current customer context matters
+
+**Analytics Agent:**
+- Recent queries most relevant
+- Historical reports less needed
+- Current data trends matter
+
+**DevOps Agent:**
+- Recent deployments critical
+- Old logs less relevant
+- Current system state matters
+
+**Limitations (universal):**
 - Can't remember conversation from last month
 - Loses important information mixed with unimportant
-- No semantic search (can't find "that time we fixed the bug")
+- No semantic search (can't find "that time we fixed the critical bug")
+
+**These limitations apply to all agent types.**
 
 ## Advanced Memory Systems
 
@@ -255,11 +276,21 @@ We're not implementing those yet. This lesson is about understanding the constra
 ## What You've Built
 
 Your agent now has:
-- Token-aware memory management
-- Bounded loading with budget
-- Sliding window behavior
-- Transparency (shows what's loaded)
-- Sustainable long-term operation
+- Token-aware memory management [UNIVERSAL]
+- Bounded loading with budget [UNIVERSAL]
+- Sliding window behavior [UNIVERSAL]
+- Transparency (shows what's loaded) [UNIVERSAL]
+- Sustainable long-term operation [UNIVERSAL]
+
+**All of this works identically across all agent types.**
+
+**Domain differences:**
+- Coding agent: Stores file operations
+- Support agent: Stores ticket interactions
+- Analytics agent: Stores queries/reports
+- DevOps agent: Stores deployments/checks
+
+**But the token budgeting logic? Identical.**
 
 ## Measuring Success
 
@@ -284,12 +315,14 @@ Loaded 92/1247 turns (179,234 tokens)
 
 This concludes the core lessons. You've built a complete, production-ready agent with:
 
-✅ Tool use
-✅ ReAct loop
-✅ Parallel execution
-✅ Clean architecture
-✅ Episodic memory
-✅ Token-based budgeting
+✅ Tool use [10% domain-specific]
+✅ ReAct loop [UNIVERSAL]
+✅ Parallel execution [UNIVERSAL]
+✅ Clean architecture [90% universal]
+✅ Episodic memory [UNIVERSAL]
+✅ Token-based budgeting [UNIVERSAL]
+
+**You can now build agents for ANY domain by changing only the TOOLS section.**
 
 **Where to go from here:**
 
@@ -312,3 +345,6 @@ The foundation is solid. Now you can build anything.
 - Trade-off: speed/cost vs. total recall
 - This approach is good enough for many use cases
 - Advanced memory systems build on this foundation
+- **Token budgeting is universal across all agent types**
+- Only the stored content changes by domain
+- The budgeting logic stays the same

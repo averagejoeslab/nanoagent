@@ -1,26 +1,106 @@
 # Lesson 9: Clean Architecture
 
-## The Problem
+## The Critical Insight
+
+Here's the most important lesson in this entire tutorial:
+
+**Out of 10 sections in your agent, only 1 is domain-specific. The other 9 are universal.**
+
+This means you can build agents for ANY domain by changing just 10% of the code.
+
+## The Universal vs Domain-Specific Split
+
+Let's look at the complete architecture:
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Section 1: Imports               [UNIVERSAL]        │
+│ Section 2: Config                [UNIVERSAL]        │
+│ Section 3: Types                 [UNIVERSAL]        │
+│ Section 4: Tools                 [YOUR DOMAIN] ←──┐ │
+│ Section 5: Tool Execution        [UNIVERSAL]       │ │
+│ Section 6: Memory                [UNIVERSAL]       │ │
+│ Section 7: LLM Interface         [UNIVERSAL]       │ │
+│ Section 8: Agentic Loop          [UNIVERSAL]       │ │
+│ Section 9: REPL/UI               [UNIVERSAL]       │ │
+└─────────────────────────────────────────────────────┘
+                                              Only this changes!
+```
+
+**This is revolutionary:** You only customize ONE section to build agents for different domains.
+
+## What Changes Between Domains
+
+Here's the same agent with different TOOLS sections:
+
+**Coding Agent:**
+```typescript
+// Section 4: Tools
+const TOOLS = {
+  read: { /* read files */ },
+  write: { /* write files */ },
+  bash: { /* run commands */ },
+  // ... other file tools
+};
+```
+
+**Support Agent:**
+```typescript
+// Section 4: Tools  
+const TOOLS = {
+  read_ticket: { /* get ticket data */ },
+  update_ticket: { /* change ticket */ },
+  send_email: { /* email customer */ },
+  // ... other support tools
+};
+```
+
+**Analytics Agent:**
+```typescript
+// Section 4: Tools
+const TOOLS = {
+  query_db: { /* run SQL */ },
+  create_chart: { /* generate viz */ },
+  export_data: { /* save results */ },
+  // ... other analytics tools
+};
+```
+
+**DevOps Agent:**
+```typescript
+// Section 4: Tools
+const TOOLS = {
+  get_logs: { /* fetch logs */ },
+  restart_service: { /* restart */ },
+  deploy: { /* deploy version */ },
+  // ... other DevOps tools
+};
+```
+
+**Sections 1-3 and 5-9? Identical across all these agents.**
+
+## The Problem (Before Organization)
 
 Our code works, but it's getting messy:
 - All in one giant file
 - Mixed concerns (tools, API calls, UI)
 - Hard to understand what each part does
-- Difficult to find specific functionality
+- Difficult to see what's universal vs specific
 
 Let's organize it properly while keeping it in a single file.
 
 ## The Goal
 
-Clean sections that are easy to navigate:
-1. **Imports** - Dependencies
-2. **Config** - Constants and settings
-3. **Types** - TypeScript interfaces
-4. **Tools** - Tool implementations
-5. **Tool Execution** - Helper functions
-6. **LLM Interface** - API communication
-7. **Agentic Loop** - Core ReAct pattern
-8. **REPL/UI** - User interface
+Clean sections with clear labels:
+1. **Imports** - Dependencies [UNIVERSAL]
+2. **Config** - Constants and settings [UNIVERSAL]
+3. **Types** - TypeScript interfaces [UNIVERSAL]
+4. **Tools** - Tool implementations [YOUR DOMAIN]
+5. **Tool Execution** - Helper functions [UNIVERSAL]
+6. **Memory** - Conversation storage [UNIVERSAL]
+7. **LLM Interface** - API communication [UNIVERSAL]
+8. **Agentic Loop** - Core ReAct pattern [UNIVERSAL]
+9. **REPL/UI** - User interface [UNIVERSAL]
 
 ## Section 1: Imports
 
@@ -79,7 +159,9 @@ type Tool = {
 };
 ```
 
-## Section 4: Tools
+## Section 4: Tools [YOUR DOMAIN]
+
+**This is the ONLY section that changes between agent types.**
 
 All tool implementations:
 
@@ -109,6 +191,32 @@ const TOOLS: Record<string, Tool> = {
   // ... other tools
 };
 ```
+
+**For a support agent, you'd replace this entire section with:**
+```typescript
+// ─── TOOLS ───────────────────────────────────────────────────────────────────
+const TOOLS: Record<string, Tool> = {
+  read_ticket: {
+    desc: "Get ticket details by ID",
+    params: ["ticket_id"],
+    fn: async (args) => {
+      const ticket = await db.tickets.find(args.ticket_id);
+      return JSON.stringify(ticket);
+    },
+  },
+  update_ticket: {
+    desc: "Update ticket status",
+    params: ["ticket_id", "status"],
+    fn: async (args) => {
+      await db.tickets.update(args.ticket_id, { status: args.status });
+      return "ok";
+    },
+  },
+  // ... other support tools
+};
+```
+
+**Everything else stays the same.**
 
 ## Section 5: Tool Execution
 
@@ -284,16 +392,41 @@ main().catch((e) => {
 - Types document interfaces
 - Comments explain the ReAct pattern
 - Each section has single responsibility
+- **Labels show what's universal vs domain-specific**
 
 **Easy to modify:**
-- Want to add a tool? Go to TOOLS section
-- Want to change UI? Go to REPL/UI section
-- Want to tweak the loop? Go to AGENTIC LOOP section
+- Want to add a tool? Go to TOOLS section (only domain-specific part)
+- Want to change UI? Go to REPL/UI section (universal - works for all agents)
+- Want to tweak the loop? Go to AGENTIC LOOP section (universal - same for all)
+
+**Easy to port to new domains:**
+- Copy the entire file
+- Replace ONLY the TOOLS section
+- Everything else works as-is
 
 **Still a single file:**
 - No complex module system
 - Easy to share and deploy
 - Fast to read and understand
+
+## The Power of This Architecture
+
+**Want to build a support agent?**
+1. Copy nanoagent.ts
+2. Replace section 4 (TOOLS) with support tools
+3. Done. Sections 1-3 and 5-9 work unchanged.
+
+**Want to build an analytics agent?**
+1. Copy nanoagent.ts
+2. Replace section 4 (TOOLS) with analytics tools
+3. Done. Sections 1-3 and 5-9 work unchanged.
+
+**Want to build a DevOps agent?**
+1. Copy nanoagent.ts
+2. Replace section 4 (TOOLS) with DevOps tools
+3. Done. Sections 1-3 and 5-9 work unchanged.
+
+**This is the universal agent pattern.**
 
 ## The File Now
 
@@ -311,17 +444,56 @@ The same functionality as before, but now:
 - Easy to extend
 - Clear teaching example
 - Production-quality organization
+- **Crystal clear which parts are universal vs domain-specific**
+
+## The 90/10 Rule
+
+**90% of your agent is universal:**
+- Imports, config, types
+- Tool execution machinery
+- Memory management
+- LLM interface
+- Agentic loop
+- UI/REPL
+
+**10% is domain-specific:**
+- The TOOLS section
+
+**This is why agents are so powerful.** The hard parts (ReAct loop, memory, LLM orchestration) are solved once. You just plug in your domain's tools.
+
+## Visualization
+
+```
+agent.ts (660 lines)
+├─ Imports (15 lines)           [UNIVERSAL]
+├─ Config (25 lines)            [UNIVERSAL]
+├─ Types (20 lines)             [UNIVERSAL]
+├─ Tools (150 lines)            [YOUR DOMAIN] ← Change this
+├─ Tool Execution (30 lines)    [UNIVERSAL]
+├─ Memory (80 lines)            [UNIVERSAL]
+├─ LLM Interface (40 lines)     [UNIVERSAL]
+├─ Agentic Loop (100 lines)     [UNIVERSAL]
+└─ REPL/UI (200 lines)          [UNIVERSAL]
+
+590 lines stay the same
+70 lines change for your domain
+```
 
 ## Next Steps
 
-In the final lesson, we'll add error handling and finishing touches.
+In the next lesson, we'll add error handling and finishing touches.
+
+These polish improvements are also universal - work for all agents.
 
 ---
 
 **Key Takeaways:**
+- **Only section 4 (TOOLS) is domain-specific**
+- **Sections 1-3 and 5-9 are universal across all agents**
+- This is the 90/10 rule: 90% universal, 10% domain
 - Clean architecture doesn't require multiple files
 - Section headers with visual separators improve navigation
-- Types document your code's interface
-- Comments should explain "why" not "what"
-- Separation of concerns makes code easier to modify
-- Single file + clean structure = best of both worlds
+- [UNIVERSAL] and [YOUR DOMAIN] labels show what changes
+- You can build agents for any domain by changing one section
+- The hard parts (loop, memory, LLM) are solved once
+- **This is why the agent pattern is so powerful**

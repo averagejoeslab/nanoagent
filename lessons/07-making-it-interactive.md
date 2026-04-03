@@ -316,39 +316,54 @@ async function main() {
 }
 ```
 
-### Use Cases
+### Use Cases by Domain
 
-**Scripts:**
+**Coding Agent:**
 ```bash
-#!/bin/bash
+# Scripts
 bun nanoagent.ts "Run tests and create a summary in test-results.md"
+
+# CI/CD
 bun nanoagent.ts "Update version in package.json to 2.0.0"
+
+# Build automation
+bun nanoagent.ts "Verify build artifacts and create manifest"
 ```
 
-**CI/CD Pipelines:**
-```yaml
-# .github/workflows/deploy.yml
-- name: Generate deployment docs
-  run: bun nanoagent.ts "Create deployment.md with current config details"
-
-- name: Update changelog
-  run: bun nanoagent.ts "Add today's changes to CHANGELOG.md from git log"
-```
-
-**Cron Jobs:**
+**Support Agent:**
 ```bash
-# Daily report
-0 9 * * * cd /project && bun nanoagent.ts "Analyze yesterday's logs and email summary"
+# Triage automation
+bun support-agent.ts "Process all unassigned tickets and categorize them"
+
+# Daily reports
+bun support-agent.ts "Generate support metrics report for yesterday"
+
+# Escalation handling
+bun support-agent.ts "Check all VIP tickets and escalate if response time > 1 hour"
 ```
 
-**Build Automation:**
-```json
-{
-  "scripts": {
-    "prepare-release": "bun nanoagent.ts 'Update README with latest API docs'",
-    "post-build": "bun nanoagent.ts 'Verify build artifacts and create manifest'"
-  }
-}
+**Analytics Agent:**
+```bash
+# Scheduled reports
+bun analytics-agent.ts "Generate daily sales summary and email to team"
+
+# Data validation
+bun analytics-agent.ts "Check data pipeline for anomalies in last hour"
+
+# Ad-hoc analysis
+bun analytics-agent.ts "Compare Q1 vs Q2 revenue by region"
+```
+
+**DevOps Agent:**
+```bash
+# Health checks
+bun devops-agent.ts "Check all production services and alert if any are down"
+
+# Deployment automation
+bun devops-agent.ts "Deploy version 2.1.0 to staging environment"
+
+# Log analysis
+bun devops-agent.ts "Analyze last hour of logs for error patterns"
 ```
 
 ### How It Works

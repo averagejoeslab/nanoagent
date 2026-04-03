@@ -40,7 +40,11 @@ Without memory, agents can't:
 - Learn from history
 - Maintain context across sessions
 
-**Example use case:**
+**This problem is universal across all domains.**
+
+### Memory Examples by Domain
+
+**Coding Agent:**
 ```
 Session 1:
 ❯ Create a config.json with default settings
@@ -48,10 +52,43 @@ Session 1:
 
 Session 2 (after restart):
 ❯ Update the debug flag in the config to true
-⏺ What config? I don't remember creating one...
+⏺ What config? I don't remember creating one... ❌
 ```
 
-With memory, the agent knows about config.json from the previous session.
+**Support Agent:**
+```
+Session 1:
+❯ Create ticket for customer John about billing issue
+⏺ Created ticket #456
+
+Session 2 (after restart):
+❯ Update the billing ticket status to resolved
+⏺ What ticket? I don't remember creating one... ❌
+```
+
+**Analytics Agent:**
+```
+Session 1:
+❯ Create a sales report for Q1
+⏺ Generated report saved as q1_sales.csv
+
+Session 2 (after restart):
+❯ Compare Q1 to Q2 sales
+⏺ Where is the Q1 report? I don't remember... ❌
+```
+
+**DevOps Agent:**
+```
+Session 1:
+❯ Deploy version 2.1.0 to staging
+⏺ Deployed successfully
+
+Session 2 (after restart):
+❯ What version is in staging?
+⏺ I don't know, I don't remember the deployment... ❌
+```
+
+**With memory, all these agents know their previous actions.**
 
 ## Implementing Episodic Memory
 
@@ -59,17 +96,39 @@ We need two things:
 1. **Save** conversations to disk
 2. **Load** conversations on startup
 
+**This implementation is universal** - works the same for all agent types.
+
 ### Storage Format: JSONL
 
 **JSONL** (JSON Lines) is perfect for append-only logs:
 
+**Coding Agent:**
 ```jsonl
 {"timestamp":"2026-03-31T00:00:00Z","user":"Create hello.ts","assistant":[...]}
 {"timestamp":"2026-03-31T00:01:00Z","user":"Read it back","assistant":[...]}
-{"timestamp":"2026-03-31T00:02:00Z","user":"Add a function","assistant":[...]}
+```
+
+**Support Agent:**
+```jsonl
+{"timestamp":"2026-03-31T00:00:00Z","user":"Create ticket for John","assistant":[...]}
+{"timestamp":"2026-03-31T00:01:00Z","user":"Update ticket status","assistant":[...]}
+```
+
+**Analytics Agent:**
+```jsonl
+{"timestamp":"2026-03-31T00:00:00Z","user":"Query sales data","assistant":[...]}
+{"timestamp":"2026-03-31T00:01:00Z","user":"Generate report","assistant":[...]}
+```
+
+**DevOps Agent:**
+```jsonl
+{"timestamp":"2026-03-31T00:00:00Z","user":"Check service health","assistant":[...]}
+{"timestamp":"2026-03-31T00:01:00Z","user":"Restart service","assistant":[...]}
 ```
 
 Each line is a complete JSON object. Easy to append, easy to read.
+
+**The format is identical across domains.**
 
 ### Creating the Trace File
 
@@ -282,14 +341,24 @@ But for now, let it grow. Experience the problem firsthand.
 - Unbounded growth reveals real constraints
 - Experience the problem before learning solutions
 - Memory management is critical for production agents
+- **Memory implementation is universal across all agent types**
+- Only the content stored changes by domain (file operations vs tickets vs queries)
 
 ## Try It
 
-Add memory to your agent. Use it for a week. See what happens when your trace file hits 100+ turns.
+Add memory to your agent. Use it extensively. See what happens when your trace file hits 100+ turns.
 
 **Then ask yourself:**
 - How much history do I really need?
 - Which conversations matter most?
 - How can I keep relevant context without everything?
 
-Those questions lead to advanced memory systems.
+Those questions lead to advanced memory systems (next lesson).
+
+**This problem occurs in all domains:**
+- Coding agents with 1000+ file operations
+- Support agents with 1000+ ticket interactions
+- Analytics agents with 1000+ queries
+- DevOps agents with 1000+ deployments
+
+**The solution (token budgeting) is also universal.**
