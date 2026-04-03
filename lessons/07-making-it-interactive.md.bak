@@ -6,8 +6,6 @@ Right now, you have to edit your code and restart the script for each request. T
 
 We need a **REPL** (Read-Eval-Print Loop) - an interactive prompt where you can type commands and get responses.
 
-**This UI pattern is universal.** Whether you're building a coding assistant, support bot, or DevOps console, the REPL works the same way.
-
 ## What is a REPL?
 
 Think of your terminal shell:
@@ -19,47 +17,16 @@ hello
 $
 ```
 
-That's a REPL. We want the same for our agent.
-
-### REPL Examples by Domain
-
-**Coding Agent:**
+That's a REPL. We want the same for our agent:
 ```
 ❯ Create a file hello.ts
 ⏺ I've created hello.ts with a hello world function
 
 ❯ Read hello.ts
 ⏺ The file contains: function hello() { console.log("Hello!"); }
-```
 
-**Support Agent:**
+❯
 ```
-❯ Show me urgent tickets
-⏺ Found 3 urgent tickets: #445, #446, #447
-
-❯ Escalate #445
-⏺ Ticket #445 escalated to senior support
-```
-
-**Analytics Agent:**
-```
-❯ Query sales for last month
-⏺ Retrieved 1,247 sales records
-
-❯ Calculate average
-⏺ Average sale: $342.50
-```
-
-**DevOps Agent:**
-```
-❯ Check API service health
-⏺ Service healthy: 0 errors, 99.9% uptime
-
-❯ Show recent deployments
-⏺ Last 3 deployments: v2.1.0, v2.0.9, v2.0.8
-```
-
-**Same REPL pattern. Different domain operations.**
 
 ## Using Node's Readline
 

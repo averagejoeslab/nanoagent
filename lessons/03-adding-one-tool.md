@@ -2,16 +2,29 @@
 
 ## What is a Tool?
 
-A tool is a function that the agent can call. You define:
+A tool is a function that connects your agent to the real world. You define:
 
 1. The function itself (what it does)
 2. A schema (how to call it)
 
 Claude looks at your tool schemas and decides when to use them based on the user's request.
 
-## Building a Read File Tool
+**Every agent needs tools. The pattern is universal.**
 
-Let's create a simple tool that reads files:
+## The Universal Read Pattern
+
+Almost every agent needs to **read data from somewhere**. The operation is different, but the pattern is identical:
+
+**Coding Agent:** Read files from disk  
+**Support Agent:** Read tickets from database  
+**Analytics Agent:** Read data from SQL  
+**DevOps Agent:** Read logs from services  
+
+**Different sources. Same pattern: get data → return it.**
+
+## Building Our First Tool
+
+We'll build a file reader for our coding agent example. But as you read the code, think about how you'd adapt it for your domain.
 
 ```typescript
 // agent.ts
@@ -30,6 +43,46 @@ async function readFileTool(path: string): Promise<string> {
   }
 }
 ```
+
+**For your domain, this becomes:**
+
+```typescript
+// Support Agent
+async function readTicketTool(ticketId: string): Promise<string> {
+  try {
+    const ticket = await database.tickets.findOne({ id: ticketId });
+    return JSON.stringify(ticket);
+  } catch (err: any) {
+    return `error: ${err.message}`;
+  }
+}
+
+// Analytics Agent
+async function queryDatabaseTool(sql: string): Promise<string> {
+  try {
+    const results = await database.query(sql);
+    return JSON.stringify(results);
+  } catch (err: any) {
+    return `error: ${err.message}`;
+  }
+}
+
+// DevOps Agent
+async function getLogsTool(service: string): Promise<string> {
+  try {
+    const logs = await kubectl.logs(service, { tail: 100 });
+    return logs;
+  } catch (err: any) {
+    return `error: ${err.message}`;
+  }
+}
+```
+
+**Same structure:**
+1. Accept parameters
+2. Try to get the data
+3. Return data or error string
+4. Never throw exceptions (LLM can't catch them)
 
 ## Defining the Tool Schema
 
@@ -60,6 +113,64 @@ const TOOLS = [
 - `description`: When to use it (be clear!)
 - `input_schema`: What parameters it takes (JSON Schema format)
 - `required`: Which parameters must be provided
+
+## 💡 Other Domain Examples
+
+**Support Agent Tool Schema:**
+```typescript
+{
+  name: "read_ticket",
+  description: "Get details of a support ticket by ID",
+  input_schema: {
+    type: "object",
+    properties: {
+      ticket_id: {
+        type: "string",
+        description: "The ticket ID to retrieve",
+      },
+    },
+    required: ["ticket_id"],
+  },
+}
+```
+
+**Analytics Agent Tool Schema:**
+```typescript
+{
+  name: "query_database",
+  description: "Execute a SQL SELECT query and return results",
+  input_schema: {
+    type: "object",
+    properties: {
+      sql: {
+        type: "string",
+        description: "The SQL query to execute (SELECT only)",
+      },
+    },
+    required: ["sql"],
+  },
+}
+```
+
+**DevOps Agent Tool Schema:**
+```typescript
+{
+  name: "get_logs",
+  description: "Fetch recent logs from a service",
+  input_schema: {
+    type: "object",
+    properties: {
+      service: {
+        type: "string",
+        description: "The service name to fetch logs from",
+      },
+    },
+    required: ["service"],
+  },
+}
+```
+
+**See the pattern?** The schema structure is identical across all domains.
 
 ## Sending Tools to Claude
 
@@ -94,6 +205,8 @@ async function callClaude(message: string) {
   return response.json();
 }
 ```
+
+**This works for all agents.** You just change what's in the `TOOLS` array.
 
 ## Test It
 
@@ -173,6 +286,18 @@ Claude wants to call: read_file
 With parameters: { path: 'test.txt' }
 ```
 
+## The Universal Pattern
+
+**What we just learned works for ALL agents:**
+
+1. Define a function (your domain logic)
+2. Define a schema (describes the function)
+3. Send tools array to Claude
+4. Claude returns tool_use when it wants to use a tool
+5. You execute the function (next lesson)
+
+**The only thing that changes is your function implementation.** The pattern stays the same.
+
 ## Full Code So Far
 
 ```typescript
@@ -237,10 +362,15 @@ if (toolCalls.length > 0) {
 
 In the next lesson, we'll actually execute the tool and send the result back to Claude.
 
+This execution pattern is also universal - same for all domains.
+
 ---
 
 **Key Takeaways:**
-- Tools are functions you define
+- Tools are functions that connect agents to the real world
 - Tool schemas tell Claude what each tool does
 - Claude returns `tool_use` blocks when it wants to use a tool
 - You still need to execute the tool yourself (next lesson!)
+- **The tool pattern is universal across all domains**
+- Only the function implementation changes
+- Schema structure stays the same

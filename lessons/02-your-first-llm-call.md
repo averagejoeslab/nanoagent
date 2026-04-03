@@ -1,5 +1,11 @@
 # Lesson 2: Your First LLM Call
 
+## Introduction
+
+The LLM API is the brain of your agent. Whether you're building a coding assistant, support bot, or analytics agent, you'll use the same API call pattern.
+
+This lesson is completely domain-agnostic - the code you write here works for any agent.
+
 ## Prerequisites
 
 Before we write any code, you need:
@@ -75,6 +81,15 @@ async function callClaude(message: string) {
 const result = await callClaude("Hello, Claude!");
 console.log(JSON.stringify(result, null, 2));
 ```
+
+**This exact code works for:**
+- Coding agents
+- Support agents
+- Analytics agents
+- DevOps agents
+- Any agent
+
+The LLM doesn't care what domain you're in. It's just text in, text out.
 
 ## Run It
 
@@ -154,11 +169,21 @@ Bun automatically loads `.env` files. No extra library needed!
 3. Claude generates a response
 4. You receive JSON with the response
 
-This is the foundation. Every agent interaction starts with an API call like this.
+**This is the foundation for ALL agents.**
+
+Whether you're asking Claude to:
+- Write code (coding agent)
+- Respond to a customer (support agent)
+- Analyze data (analytics agent)
+- Check server health (DevOps agent)
+
+The API call is identical. The difference comes later when you add **tools** (next lesson).
 
 ## Next Steps
 
 In the next lesson, we'll add our first tool and see how Claude can request to use it.
+
+This is where your agent becomes domain-specific. For now, the API call is universal.
 
 ---
 
@@ -167,3 +192,5 @@ In the next lesson, we'll add our first tool and see how Claude can request to u
 - You send messages with `role: "user"` and `content`
 - Claude responds with `content` blocks (text or tool_use)
 - Always use environment variables for API keys
+- **This API call works the same for every type of agent**
+- Domain differences appear when you add tools (next lesson)

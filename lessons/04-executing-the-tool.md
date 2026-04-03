@@ -8,6 +8,8 @@ Claude told us it wants to call `read_file` with `{ path: "test.txt" }`. Now we 
 2. Send the result back to Claude
 3. Get Claude's final response
 
+**This execution pattern works for ALL agents, regardless of domain.**
+
 ## Executing the Tool
 
 When Claude returns a `tool_use` block, extract the parameters and call your function:
@@ -38,6 +40,27 @@ Tool result: Hello from file!
 
 Great! We executed the tool. But Claude doesn't know the result yet.
 
+**This works identically for other domains:**
+
+```typescript
+// Support agent
+if (call.name === "read_ticket") {
+  const toolResult = await readTicketTool(call.input.ticket_id);
+}
+
+// Analytics agent
+if (call.name === "query_database") {
+  const toolResult = await queryDatabaseTool(call.input.sql);
+}
+
+// DevOps agent
+if (call.name === "get_logs") {
+  const toolResult = await getLogsTool(call.input.service);
+}
+```
+
+**Same pattern. Different function calls.**
+
 ## Sending the Result Back
 
 You need to send the tool result back to Claude in a specific format:
@@ -54,6 +77,8 @@ You need to send the tool result back to Claude in a specific format:
   ]
 }
 ```
+
+**This format is universal.** Whether you're returning file contents, ticket data, SQL results, or server logs, the structure is identical.
 
 ## Building the Conversation
 
@@ -147,6 +172,8 @@ async function callClaude(messages: any[]) {
   return response.json();
 }
 ```
+
+**This works for all agents.** The conversation structure doesn't change by domain.
 
 ## Test the Full Flow
 
@@ -264,11 +291,21 @@ You now have a working agent that can:
 - Execute that tool
 - Return a natural language response
 
+**This architecture works for any domain:**
+- Coding agent reading files
+- Support agent reading tickets
+- Analytics agent querying databases
+- DevOps agent fetching logs
+
+**The mechanics are identical.**
+
 But it can only do this **once**. If Claude needs multiple tool calls, it won't work yet.
 
 ## Next Steps
 
 In the next lesson, we'll add the loop so Claude can chain multiple operations together.
+
+The loop is also universal - same pattern for all agents.
 
 ---
 
@@ -278,3 +315,5 @@ In the next lesson, we'll add the loop so Claude can chain multiple operations t
 - Match `tool_use_id` to connect results to requests
 - Conversation is built as an array of messages
 - Claude can now use tools to complete simple tasks
+- **This execution pattern works identically across all domains**
+- Only the tool function calls change
