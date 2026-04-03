@@ -12,13 +12,6 @@ RUN apt-get update && apt-get install -y \
 # Create workspace
 WORKDIR /workspace
 
-# Create non-root user
-RUN groupadd -r sandbox -g 1000 && \
-    useradd -r -g sandbox -u 1000 -m -s /bin/bash sandbox && \
-    chown -R sandbox:sandbox /workspace
-
-# Switch to non-root user
-USER sandbox
-
 # Keep container running for persistent sessions
+# Note: Container will run as host user via --user flag for proper file permissions
 CMD ["sleep", "infinity"]

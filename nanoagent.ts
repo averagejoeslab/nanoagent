@@ -23,7 +23,7 @@ const SYSTEM_PROMPT_OVERHEAD = 500;
 const MEMORY_BUDGET = CONTEXT_WINDOW - MAX_TOKENS - SYSTEM_PROMPT_OVERHEAD - 10000; // Reserve 10k for safety
 
 // Sandbox configuration
-const USE_SANDBOX = process.env.SANDBOX !== "false"; // Enabled by default
+const USE_SANDBOX = process.env.DISABLE_SANDBOX !== "true"; // Enabled by default
 const SANDBOX_MEMORY = "512m";
 const SANDBOX_CPUS = "1.0";
 const SANDBOX_PIDS = 100;
@@ -89,8 +89,8 @@ class Sandbox {
       // Filesystem
       "--read-only",
       "--tmpfs", "/tmp:rw,noexec,nosuid,size=100m",
-      "--tmpfs", "/workspace:rw,size=500m",
-      "-v", `${cwd}:/mnt/host:ro`,
+      "-v", `${cwd}:/workspace`,
+      "--user", `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
       "-w", "/workspace",
       // Resources
       "--memory", SANDBOX_MEMORY,
@@ -189,9 +189,9 @@ class Sandbox {
 // Singleton sandbox instance for session persistence
 let globalSandbox: Sandbox | null = null;
 
-async function getSandbox(): Promise<Sandbox> {
+async function getSandbox(): Promise<Sandbox | null> {
   if (!USE_SANDBOX) {
-    throw new Error("Sandbox disabled");
+    return null;
   }
 
   if (!globalSandbox) {
@@ -227,7 +227,24 @@ const TOOLS: Record<string, Tool> = {
     desc: "Read file with line numbers. Use offset/limit to paginate large files (0-indexed line numbers)",
     params: ["path", "offset?", "limit?"],
     fn: async (args) => {
-      const lines = (await readFile(args.path, "utf-8")).split("\n");
+      const sandbox = await getSandbox();
+      
+      if (!sandbox) {
+        const lines = (await readFile(args.path, "utf-8")).split("\n");
+        const start = args.offset ?? 0;
+        const end = start + (args.limit ?? lines.length);
+        return lines.slice(start, end).map((line, i) => 
+          `${String(start + i + 1).padStart(4)}| ${line}`
+        ).join("\n");
+      }
+      
+      const result = await sandbox.exec(`cat "${args.path}"`);
+      
+      if (result.exitCode !== 0) {
+        return `error: ${result.stderr || "Failed to read file"}`;
+      }
+      
+      const lines = result.stdout.split("\n");
       const start = args.offset ?? 0;
       const end = start + (args.limit ?? lines.length);
       return lines.slice(start, end).map((line, i) => 
@@ -239,7 +256,20 @@ const TOOLS: Record<string, Tool> = {
     desc: "Write content to file",
     params: ["path", "content"],
     fn: async (args) => {
-      await writeFile(args.path, args.content, "utf-8");
+      const sandbox = await getSandbox();
+      
+      if (!sandbox) {
+        await writeFile(args.path, args.content, "utf-8");
+        return "ok";
+      }
+      
+      const escaped = args.content.replace(/'/g, "'\\''");
+      const result = await sandbox.exec(`cat > "${args.path}" << 'EOF'\n${escaped}\nEOF`);
+      
+      if (result.exitCode !== 0) {
+        return `error: ${result.stderr || "Failed to write file"}`;
+      }
+      
       return "ok";
     },
   },
@@ -247,13 +277,41 @@ const TOOLS: Record<string, Tool> = {
     desc: "Replace old with new in file. Use all=true to replace all occurrences",
     params: ["path", "old", "new", "all?"],
     fn: async (args) => {
-      const content = await readFile(args.path, "utf-8");
+      const sandbox = await getSandbox();
+      
+      if (!sandbox) {
+        const content = await readFile(args.path, "utf-8");
+        if (!content.includes(args.old)) return "error: old_string not found";
+        const escaped = args.old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const count = (content.match(new RegExp(escaped, "g")) ?? []).length;
+        if (!args.all && count > 1) return `error: old_string appears ${count} times. Use all=true to replace all`;
+        const result = args.all ? content.replaceAll(args.old, args.new) : content.replace(args.old, args.new);
+        await writeFile(args.path, result, "utf-8");
+        return "ok";
+      }
+      
+      const readResult = await sandbox.exec(`cat "${args.path}"`);
+      if (readResult.exitCode !== 0) {
+        return `error: ${readResult.stderr || "Failed to read file"}`;
+      }
+      
+      const content = readResult.stdout;
       if (!content.includes(args.old)) return "error: old_string not found";
+      
       const escaped = args.old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const count = (content.match(new RegExp(escaped, "g")) ?? []).length;
-      if (!args.all && count > 1) return `error: old_string appears ${count} times. Use all=true to replace all`;
-      const result = args.all ? content.replaceAll(args.old, args.new) : content.replace(args.old, args.new);
-      await writeFile(args.path, result, "utf-8");
+      if (!args.all && count > 1) {
+        return `error: old_string appears ${count} times. Use all=true to replace all`;
+      }
+      
+      const newContent = args.all ? content.replaceAll(args.old, args.new) : content.replace(args.old, args.new);
+      const escapedContent = newContent.replace(/'/g, "'\\''");
+      const writeResult = await sandbox.exec(`cat > "${args.path}" << 'EOF'\n${escapedContent}\nEOF`);
+      
+      if (writeResult.exitCode !== 0) {
+        return `error: ${writeResult.stderr || "Failed to write file"}`;
+      }
+      
       return "ok";
     },
   },
@@ -261,60 +319,84 @@ const TOOLS: Record<string, Tool> = {
     desc: "Find files by pattern. Defaults to current directory if path not specified",
     params: ["pat", "path?"],
     fn: async (args) => {
-      const files: string[] = [];
-      for await (const file of new Bun.Glob(`${args.path ?? "."}/${args.pat}`).scan()) {
-        files.push(file);
+      const sandbox = await getSandbox();
+      
+      if (!sandbox) {
+        const files: string[] = [];
+        for await (const file of new Bun.Glob(`${args.path ?? "."}/${args.pat}`).scan()) {
+          files.push(file);
+        }
+        return files.join("\n") || "none";
       }
-      return files.join("\n") || "none";
+      
+      const searchPath = args.path ?? ".";
+      const result = await sandbox.exec(`find ${searchPath} -name "${args.pat}" 2>/dev/null | sort`);
+      
+      if (result.exitCode !== 0 && result.stderr) {
+        return `error: ${result.stderr}`;
+      }
+      
+      return result.stdout || "none";
     },
   },
   grep: {
     desc: "Search files for regex. Defaults to current directory if path not specified",
     params: ["pat", "path?"],
     fn: async (args) => {
-      const pattern = new RegExp(args.pat);
-      const hits: string[] = [];
-      for await (const file of new Bun.Glob(`${args.path ?? "."}/**`).scan()) {
-        if (file.includes("node_modules")) continue;
-        try {
-          const content = await readFile(file, "utf-8");
-          content.split("\n").forEach((line, i) => {
-            if (pattern.test(line)) hits.push(`${file}:${i + 1}:${line.trim()}`);
-          });
-        } catch {}
+      const sandbox = await getSandbox();
+      
+      if (!sandbox) {
+        const pattern = new RegExp(args.pat);
+        const hits: string[] = [];
+        for await (const file of new Bun.Glob(`${args.path ?? "."}/**`).scan()) {
+          if (file.includes("node_modules")) continue;
+          try {
+            const content = await readFile(file, "utf-8");
+            content.split("\n").forEach((line, i) => {
+              if (pattern.test(line)) hits.push(`${file}:${i + 1}:${line.trim()}`);
+            });
+          } catch {}
+        }
+        return hits.slice(0, 50).join("\n") || "none";
       }
-      return hits.slice(0, 50).join("\n") || "none";
+      
+      const searchPath = args.path ?? ".";
+      const result = await sandbox.exec(
+        `grep -r -n --exclude-dir=node_modules "${args.pat}" ${searchPath} 2>/dev/null | head -n 50`
+      );
+      
+      if (result.exitCode !== 0 && result.stderr) {
+        return `error: ${result.stderr}`;
+      }
+      
+      return result.stdout || "none";
     },
   },
   bash: {
     desc: "Run shell command (sandboxed)",
     params: ["cmd"],
     fn: async (args) => {
-      if (USE_SANDBOX) {
+      const sandbox = await getSandbox();
+      
+      if (!sandbox) {
         try {
-          const sandbox = await getSandbox();
-          const result = await sandbox.exec(args.cmd);
-
-          if (result.timedOut) {
-            return `error: command timed out after ${SHELL_TIMEOUT}ms`;
-          }
-
-          if (result.exitCode !== 0) {
-            return result.stderr || result.stdout || `error: exit code ${result.exitCode}`;
-          }
-
-          return result.stdout || "(empty)";
+          return execSync(args.cmd, { encoding: "utf-8", timeout: SHELL_TIMEOUT }).trim() || "(empty)";
         } catch (err: any) {
-          return `error: ${err.message}`;
+          return (err.stdout || err.stderr || String(err)).trim();
         }
       }
+      
+      const result = await sandbox.exec(args.cmd);
 
-      // Fallback to host execution (not recommended)
-      try {
-        return execSync(args.cmd, { encoding: "utf-8", timeout: SHELL_TIMEOUT }).trim() || "(empty)";
-      } catch (err: any) {
-        return (err.stdout || err.stderr || String(err)).trim();
+      if (result.timedOut) {
+        return `error: command timed out after ${SHELL_TIMEOUT}ms`;
       }
+
+      if (result.exitCode !== 0) {
+        return result.stderr || result.stdout || `error: exit code ${result.exitCode}`;
+      }
+
+      return result.stdout || "(empty)";
     },
   },
 };
@@ -506,7 +588,7 @@ async function main() {
   // One-off mode: run single prompt and exit
   if (oneOffPrompt) {
     const { messages } = await loadTrace();
-    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}${USE_SANDBOX ? "\n\nSECURITY: bash commands run in sandboxed Docker container (no network, read-only host files, 512MB RAM, 1 CPU)." : ""}`;
+    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}${USE_SANDBOX ? "\n\nSECURITY: All tools run in sandboxed Docker container (no network, isolated filesystem, 512MB RAM, 1 CPU)." : ""}`;
     
     messages.push({ role: "user", content: oneOffPrompt });
     await agenticLoop(messages, systemPrompt);
