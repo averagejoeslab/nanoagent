@@ -38,67 +38,59 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Review codebase
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          DISABLE_SANDBOX: "true"  # Run on host in CI (runner already isolated)
-        run: |
-          bun nanoagent.ts "Review all TypeScript files in this repository. Check for:
-          - Code quality issues
-          - Potential bugs
-          - Performance problems
-          - Missing error handling
-          - Inconsistencies with README
-          - Security concerns
-          
-          Create a detailed report in review-report.md with your findings."
-
-      - name: Check if report exists
-        id: check_report
-        run: |
-          if [ -f review-report.md ]; then
-            echo "has_report=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_report=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create issues from findings
-        if: steps.check_report.outputs.has_report == 'true'
+      - name: Self-review workflow
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ github.token }}
-          DISABLE_SANDBOX: "true"  # Run on host in CI (runner already isolated)
+          DISABLE_SANDBOX: "true"
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          IS_PR: ${{ github.event_name == 'pull_request' }}
         run: |
-          bun nanoagent.ts "First, use bash tool to run 'gh issue list --state open --json number,title,body --limit 100' to get existing open issues.
+          bun nanoagent.ts "Complete self-review workflow in one continuous session:
           
-          Then read review-report.md and for each distinct issue found:
-          1. Check if a similar issue already exists (compare titles and content)
-          2. If a similar issue exists:
-             - Check if the new finding contains additional information not in the existing issue
-             - If yes, add a comment to the existing issue using 'gh issue comment <number> --body <new info>'
-             - If no new info, skip it
-          3. If no similar issue exists, create a new GitHub issue using 'gh issue create' with:
-             - Clear title prefixed with [Nanoagent Review]
-             - Detailed description from the report
-             - Appropriate labels (bug, enhancement, documentation, etc.)
+          STEP 1: Review all TypeScript files in this repository
+          - Check for code quality issues
+          - Check for potential bugs
+          - Check for performance problems
+          - Check for missing error handling
+          - Check for inconsistencies with README
+          - Check for security concerns
           
-          At the end, report stats: created, updated, skipped.
-          Skip creating issues if no problems were found."
+          STEP 2: Create review report
+          - Write your detailed findings to review-report.md
+          - If no issues found, write 'No issues found.' to the file and skip to final stats
+          
+          STEP 3: Get existing GitHub issues (if issues were found)
+          - Use bash tool: gh issue list --state open --json number,title,body --limit 100
+          - Parse the JSON output to understand existing issues
+          
+          STEP 4: Process findings into GitHub issues (if issues were found)
+          For each distinct issue in your review:
+          - Compare with existing issues (check title and content similarity)
+          - If similar issue exists:
+            * Determine if your finding contains new information not in the existing issue
+            * If yes: use bash tool to comment: gh issue comment <number> --body '<new info>'
+            * If no new info: skip this finding
+          - If no similar issue exists:
+            * Use bash tool to create: gh issue create --title '[Nanoagent Review] <clear title>' --body '<detailed description>' --label <bug|enhancement|documentation>
+          
+          STEP 5: PR comment (only if this is a pull request)
+          - Check if environment variable IS_PR equals 'true'
+          - If yes:
+            * Read review-report.md
+            * Create a concise summary of the key findings
+            * Use bash tool to post: gh pr comment \$PR_NUMBER --body '<summary>'
+          - If no: skip this step
+          
+          STEP 6: Report final statistics
+          - Print clear stats: 'Review complete. Created X issues, updated Y issues, skipped Z issues.'
+          
+          Execute all steps in order using your available tools (read, write, bash). Reason through each step and take appropriate actions."
 
       - name: Upload review report
-        if: steps.check_report.outputs.has_report == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: code-review-report
           path: review-report.md
           retention-days: 30
-
-      - name: Comment on PR
-        if: github.event_name == 'pull_request' && steps.check_report.outputs.has_report == 'true'
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GH_TOKEN: ${{ github.token }}
-          DISABLE_SANDBOX: "true"  # Run on host in CI (runner already isolated)
-        run: |
-          bun nanoagent.ts "Read review-report.md and create a concise summary of the findings. Then use bash tool to post it as a PR comment using:
-          gh pr comment ${{ github.event.pull_request.number }} --body '<summary here>'"
+        if: always()
