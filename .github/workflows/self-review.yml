@@ -3,8 +3,20 @@ name: Nanoagent Self Review
 on:
   push:
     branches: [main, master]
+    paths:
+      - 'nanoagent.ts'
+      - 'Dockerfile.sandbox'
+      - 'package.json'
+      - 'bun.lockb'
+      - '.github/workflows/**'
   pull_request:
     branches: [main, master]
+    paths:
+      - 'nanoagent.ts'
+      - 'Dockerfile.sandbox'
+      - 'package.json'
+      - 'bun.lockb'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
