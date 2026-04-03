@@ -1,4 +1,4 @@
-# Lesson 6: Adding More Tools
+# Lesson 7: Adding More Tools
 
 ## Beyond Reading
 
@@ -477,7 +477,7 @@ const SOCIAL_MEDIA_TOOLS = [
 
 ## Next Steps
 
-In the next lesson, we'll add an interactive REPL so you can have conversations with your agent.
+Now that you have a well-organized agent with 6 powerful tools, let's add an interactive REPL so you can have conversations with your agent.
 
 This UI pattern is also universal - same REPL works for all agent types.
 

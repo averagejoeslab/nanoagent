@@ -1,8 +1,8 @@
-# Lesson 12: Token Budgeting and Memory Management
+# Lesson 11: Token Budgeting and Memory Management
 
 ## The Problem You've Discovered
 
-If you've been using your agent extensively since Lesson 11, you've probably noticed:
+If you've been using your agent extensively since Lesson 10, you've probably noticed:
 
 - Slower responses after many conversations
 - Higher API costs
@@ -313,7 +313,15 @@ Loaded 92/1247 turns (179,234 tokens)
 
 ## Next Steps
 
-This concludes the core lessons. You've built a complete, production-ready agent with:
+## Next Steps
+
+In the next lesson, we'll add production-grade security with Docker sandboxing.
+
+This is critical for running agents in production environments.
+
+---
+
+**What You've Built So Far:**
 
 ✅ Tool use [10% domain-specific]
 ✅ ReAct loop [UNIVERSAL]

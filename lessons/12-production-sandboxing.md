@@ -1,4 +1,4 @@
-# Lesson 13: Production Sandboxing
+# Lesson 12: Production Sandboxing
 
 ## Introduction
 

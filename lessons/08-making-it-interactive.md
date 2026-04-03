@@ -1,4 +1,4 @@
-# Lesson 7: Making it Interactive (REPL)
+# Lesson 8: Making it Interactive (REPL)
 
 ## The Problem
 

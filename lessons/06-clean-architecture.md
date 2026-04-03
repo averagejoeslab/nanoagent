@@ -1,4 +1,4 @@
-# Lesson 9: Clean Architecture
+# Lesson 6: Clean Architecture
 
 ## The Critical Insight
 
@@ -481,9 +481,9 @@ agent.ts (660 lines)
 
 ## Next Steps
 
-In the next lesson, we'll add error handling and finishing touches.
+In the next lesson, we'll add more tools to our clean architecture.
 
-These polish improvements are also universal - work for all agents.
+You'll see how easy it is to extend a well-organized codebase.
 
 ---
 

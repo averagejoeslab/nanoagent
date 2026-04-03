@@ -1,4 +1,4 @@
-# Lesson 11: Episodic Memory
+# Lesson 10: Episodic Memory
 
 ## The Problem
 

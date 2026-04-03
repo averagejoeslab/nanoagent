@@ -1,4 +1,4 @@
-# Lesson 8: Parallel Execution
+# Lesson 9: Parallel Execution
 
 ## The Problem
 
@@ -275,7 +275,7 @@ Your agent now:
 
 ## Next Steps
 
-In the next lesson, we'll organize our code into clean sections with proper types.
+In the next lesson, we'll add episodic memory so your agent remembers conversations across sessions.
 
 ---
 
