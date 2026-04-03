@@ -160,7 +160,7 @@ This prevents:
 For development or trusted environments:
 
 ```bash
-SANDBOX=false bun nanoagent.ts
+DISABLE_SANDBOX=true bun nanoagent.ts
 ```
 
 **⚠️ Warning**: Running without sandbox allows direct host access. Only disable for trusted prompts.
@@ -171,7 +171,7 @@ See [SANDBOX.md](SANDBOX.md) for complete documentation and security model detai
 
 ### Single-File Design
 
-The entire application is contained in `nanoagent.ts` (~530 lines) with clear sections:
+The entire application is contained in `nanoagent.ts` (~660 lines) with clear sections:
 
 - Imports (Node.js modules, tiktoken for token counting)
 - Config (API URL, model, memory budget, ANSI colors, sandbox settings)
@@ -246,7 +246,7 @@ bun build nanoagent.ts --compile --target=linux-arm64 --outfile nanoagent-linux-
 
 ```
 nanoagent/
-├── nanoagent.ts         # Main application (single file, ~530 lines)
+├── nanoagent.ts         # Main application (single file, ~660 lines)
 ├── Dockerfile.sandbox   # Docker sandbox image definition
 ├── package.json         # Dependencies (js-tiktoken)
 ├── .env                # API key (gitignored)
@@ -327,7 +327,7 @@ Each lesson is a complete guide assuming no prior knowledge.
 
 ## Contributing
 
-This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~530 lines in a single file, making it easy to understand, modify, and extend.
+This is a minimal implementation designed for simplicity and clarity. The entire codebase is ~660 lines in a single file, making it easy to understand, modify, and extend.
 
 To add a new tool:
 
