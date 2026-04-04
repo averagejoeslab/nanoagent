@@ -81,11 +81,19 @@ jobs:
              - Close duplicate: gh issue close <number> --reason 'not planned' --comment 'Duplicate of #<primary>'
           
           For each OPEN ISSUE not found in your findings:
-          a) Verify if issue still exists by reading the relevant code
-          b) If issue is FIXED/RESOLVED:
-             - Close it: gh issue close <number> --reason 'completed' --comment 'Verified fixed in current codebase: <explanation>'
-          c) If issue STILL EXISTS (false negative in review):
+          a) MANDATORY: Read the specific code section mentioned in the issue
+             - Use the read tool to check the exact file/line mentioned
+             - Use grep to search for the pattern/code the issue describes
+             - Do NOT skip this step - you must verify EVERY open issue
+          b) If issue is FIXED/RESOLVED (code no longer has the problem):
+             - Close it: gh issue close <number> --reason 'completed' --comment 'Verified fixed in current codebase. Checked [file:line] and confirmed: <specific explanation of what was fixed>'
+          c) If issue STILL EXISTS (confirmed by reading code):
              - Keep it open, do not close
+             - Add comment documenting verification: gh issue comment <number> --body 'Verified still exists in current code at [location]. Confirmed: <specific evidence>'
+          
+          IMPORTANT: You MUST verify at least 10 open issues by actually reading code.
+          Do NOT make assumptions. Read the actual code files to confirm each issue's status.
+          Log each verification: "Verified #X by reading [file] - Status: [OPEN/CLOSED]"
           
           STEP 4: Write ISSUES.md
           After all reconciliation, create ISSUES.md with:
@@ -121,12 +129,20 @@ jobs:
           STEP 6: Report final statistics
           Print clear stats:
           - 'Review complete.'
-          - 'Created: X new issues'
-          - 'Updated: Y existing issues'
-          - 'Closed: Z resolved issues'
+          - 'Code sections verified: X issues'
+          - 'Created: Y new issues'
+          - 'Updated: Z existing issues'
+          - 'Closed: W resolved issues'
           - 'Total open: N issues'
           
-          Execute all steps in order. Use your tools (read, write, bash) to complete the workflow. ISSUES.md must accurately reflect all open GitHub issues after reconciliation."
+          Execute all steps in order. Use your tools (read, write, bash) to complete the workflow.
+          
+          CRITICAL REQUIREMENTS:
+          - You MUST use the read tool to verify at least 10 open issues by checking actual code
+          - You MUST close issues that are verifiably fixed (with specific evidence from code)
+          - You MUST not assume issues are valid without reading the code
+          - ISSUES.md must accurately reflect all open GitHub issues after reconciliation
+          - Log each code verification you perform for transparency"
 
       - name: Commit ISSUES.md
         run: |
