@@ -45,8 +45,8 @@ jobs:
           DISABLE_SANDBOX: "true"
           PR_NUMBER: ${{ github.event.pull_request.number }}
           IS_PR: ${{ github.event_name == 'pull_request' }}
-        run: >
-          bun nanoagent.ts "Complete self-review and issue reconciliation workflow:
+        run: |
+          .github/scripts/run-agent.sh "Complete self-review and issue reconciliation workflow:
           
           STEP 1: Review all TypeScript files in this repository
           - Check for code quality issues
