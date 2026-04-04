@@ -46,7 +46,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           IS_PR: ${{ github.event_name == 'pull_request' }}
         run: |
-          bun nanoagent.ts "Complete self-review workflow in one continuous session:
+          bun nanoagent.ts "Complete self-review and issue reconciliation workflow:
           
           STEP 1: Review all TypeScript files in this repository
           - Check for code quality issues
@@ -55,42 +55,92 @@ jobs:
           - Check for missing error handling
           - Check for inconsistencies with README
           - Check for security concerns
+          - Document each finding with priority level (Critical/High/Medium/Low)
           
-          STEP 2: Create review report
-          - Write your detailed findings to review-report.md
-          - If no issues found, write 'No issues found.' to the file and skip to final stats
+          STEP 2: Get all open GitHub issues
+          - Use bash tool: gh issue list --state open --json number,title,body,labels --limit 200
+          - Parse the JSON to understand existing issues
           
-          STEP 3: Get existing GitHub issues (if issues were found)
-          - Use bash tool: gh issue list --state open --json number,title,body --limit 100
-          - Parse the JSON output to understand existing issues
+          STEP 3: Compare findings to existing issues and reconcile
           
-          STEP 4: Process findings into GitHub issues (if issues were found)
-          For each distinct issue in your review:
-          - Compare with existing issues (check title and content similarity)
-          - If similar issue exists:
-            * Determine if your finding contains new information not in the existing issue
-            * If yes: use bash tool to comment: gh issue comment <number> --body '<new info>'
-            * If no new info: skip this finding
-          - If no similar issue exists:
-            * Use bash tool to create: gh issue create --title '[Nanoagent Review] <clear title>' --body '<detailed description>' --label <bug|enhancement|documentation>
+          For each FINDING from your review:
+          a) Check if exact match exists in open issues
+             - If exact match: skip (already tracked)
+          
+          b) Check if similar issue exists
+             - If similar with NEW information: use bash to comment on existing issue
+               gh issue comment <number> --body '<new information>'
+             - If similar with NO new info: skip
+          
+          c) If no match exists: create new GitHub issue
+             gh issue create --title '[Nanoagent Review] <clear title>' --body '<detailed description>' --label <bug|enhancement|documentation>
+          
+          d) Identify any duplicate issues in your findings
+             - For duplicates: consolidate into primary issue
+             - Add comment to primary preserving all info
+             - Close duplicate: gh issue close <number> --reason 'not planned' --comment 'Duplicate of #<primary>'
+          
+          For each OPEN ISSUE not found in your findings:
+          a) Verify if issue still exists by reading the relevant code
+          b) If issue is FIXED/RESOLVED:
+             - Close it: gh issue close <number> --reason 'completed' --comment 'Verified fixed in current codebase: <explanation>'
+          c) If issue STILL EXISTS (false negative in review):
+             - Keep it open, do not close
+          
+          STEP 4: Write ISSUES.md
+          After all reconciliation, create ISSUES.md with:
+          - All currently OPEN GitHub issues (after your changes)
+          - Group by priority: Critical, High, Medium, Low
+          - Each entry: '- #<number> - <title>'
+          - Link to actual GitHub issue numbers
+          - Clean, readable format
+          - NO closed issues
+          
+          Example format:
+          # Open Issues
+          
+          ## Critical (3)
+          - #55 - Command injection vulnerabilities
+          - #74 - Uncaught promise rejections
+          - #80 - API key validation missing
+          
+          ## High (2)
+          - #46 - Race condition in sandbox
+          - #65 - No max iteration limit
+          
+          ...and so on for Medium and Low priorities.
           
           STEP 5: PR comment (only if this is a pull request)
           - Check if environment variable IS_PR equals 'true'
           - If yes:
-            * Read review-report.md
-            * Create a concise summary of the key findings
-            * Use bash tool to post: gh pr comment \$PR_NUMBER --body '<summary>'
+            * Read ISSUES.md
+            * Create concise summary of changes made (created/updated/closed counts)
+            * Post: gh pr comment \$PR_NUMBER --body '<summary>'
           - If no: skip this step
           
           STEP 6: Report final statistics
-          - Print clear stats: 'Review complete. Created X issues, updated Y issues, skipped Z issues.'
+          Print clear stats:
+          - 'Review complete.'
+          - 'Created: X new issues'
+          - 'Updated: Y existing issues'
+          - 'Closed: Z resolved issues'
+          - 'Total open: N issues'
           
-          Execute all steps in order using your available tools (read, write, bash). Reason through each step and take appropriate actions."
+          Execute all steps in order. Use your tools (read, write, bash) to complete the workflow. ISSUES.md must accurately reflect all open GitHub issues after reconciliation."
 
-      - name: Upload review report
+      - name: Commit ISSUES.md
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add ISSUES.md
+          git diff --staged --quiet || git commit -m "chore: update ISSUES.md from self-review"
+          git push
+        if: github.event_name != 'pull_request'
+      
+      - name: Upload ISSUES.md artifact
         uses: actions/upload-artifact@v4
         with:
-          name: code-review-report
-          path: review-report.md
+          name: issues-report
+          path: ISSUES.md
           retention-days: 30
         if: always()
