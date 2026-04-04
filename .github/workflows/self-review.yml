@@ -142,7 +142,7 @@ jobs:
           - You MUST close issues that are verifiably fixed (with specific evidence from code)
           - You MUST not assume issues are valid without reading the code
           - ISSUES.md must accurately reflect all open GitHub issues after reconciliation
-          - Log each code verification you perform for transparency"
+          - Log each code verification you perform for transparency" 2>&1 | cat
 
       - name: Commit ISSUES.md
         run: |
