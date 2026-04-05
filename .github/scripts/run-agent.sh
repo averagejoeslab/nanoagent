@@ -7,8 +7,7 @@ set -e
 PROMPT="$1"
 
 # Run nanoagent and capture all output to a log file
-# Use npx bun to ensure it's available
-npx --yes bun nanoagent.ts "$PROMPT" > /tmp/agent-output.log 2>&1
+bun nanoagent.ts "$PROMPT" > /tmp/agent-output.log 2>&1
 EXIT_CODE=$?
 
 # Display the output for visibility in GitHub Actions logs

@@ -9,6 +9,7 @@ on:
       - 'package.json'
       - 'bun.lockb'
       - '.github/workflows/**'
+      - '.github/scripts/**'
   pull_request:
     branches: [main, master]
     paths:
@@ -17,6 +18,7 @@ on:
       - 'package.json'
       - 'bun.lockb'
       - '.github/workflows/**'
+      - '.github/scripts/**'
   workflow_dispatch:
 
 permissions:
