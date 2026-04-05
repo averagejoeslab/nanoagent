@@ -48,7 +48,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           IS_PR: ${{ github.event_name == 'pull_request' }}
         run: |
-          bash .github/scripts/run-agent.sh "Complete self-review and issue reconciliation workflow:
+          bash .github/scripts/run-agent.sh "$(cat <<'PROMPT_EOF'
+          Complete self-review and issue reconciliation workflow:
           
           STEP 1: Review all TypeScript files in this repository
           - Check for code quality issues
@@ -144,7 +145,9 @@ jobs:
           - You MUST close issues that are verifiably fixed (with specific evidence from code)
           - You MUST not assume issues are valid without reading the code
           - ISSUES.md must accurately reflect all open GitHub issues after reconciliation
-          - Log each code verification you perform for transparency"
+          - Log each code verification you perform for transparency
+          PROMPT_EOF
+          )"
 
       - name: Commit ISSUES.md
         run: |
