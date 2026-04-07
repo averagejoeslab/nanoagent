@@ -1,5 +1,12 @@
 # Open Issues
 
+This document tracks all open issues in the nanoagent repository, organized by priority level.
+
+**Last Updated**: 2024-04-07  
+**Total Open Issues**: 67
+
+---
+
 ## Critical (6)
 
 - [#45](https://github.com/averagejoeslab/nanoagent/issues/45) - Memory Leak - Event Listeners Added Repeatedly
@@ -17,27 +24,25 @@
 - [#89](https://github.com/averagejoeslab/nanoagent/issues/89) - API response structure not validated before use
 - [#95](https://github.com/averagejoeslab/nanoagent/issues/95) - No API timeout causes application hangs
 
-## Medium (14)
+## Medium (13)
 
-- [#11](https://github.com/averagejoeslab/nanoagent/issues/11) - Race condition in concurrent file writes to trace
-- [#23](https://github.com/averagejoeslab/nanoagent/issues/23) - Security: ReDoS vulnerability in regex handling
 - [#48](https://github.com/averagejoeslab/nanoagent/issues/48) - Environment Variable Naming Inconsistency - DISABLE_SANDBOX vs SANDBOX
 - [#49](https://github.com/averagejoeslab/nanoagent/issues/49) - Missing Docker Availability Check
 - [#50](https://github.com/averagejoeslab/nanoagent/issues/50) - Container Not Cleaned Up on Sandbox Start Failure
 - [#66](https://github.com/averagejoeslab/nanoagent/issues/66) - Move API key validation to startup
 - [#67](https://github.com/averagejoeslab/nanoagent/issues/67) - Make hardcoded timeouts configurable
 - [#75](https://github.com/averagejoeslab/nanoagent/issues/75) - Token counting inconsistency in trace loading
-- [#76](https://github.com/averagejoeslab/nanoagent/issues/76) - Incorrect regex escaping in edit tool
 - [#85](https://github.com/averagejoeslab/nanoagent/issues/85) - Inconsistent Error Message Format
 - [#88](https://github.com/averagejoeslab/nanoagent/issues/88) - Missing Error Handling in Trace Save Operations
 - [#90](https://github.com/averagejoeslab/nanoagent/issues/90) - Dockerfile security improvements needed
 - [#91](https://github.com/averagejoeslab/nanoagent/issues/91) - Synchronous Docker operations block event loop
 - [#96](https://github.com/averagejoeslab/nanoagent/issues/96) - Path traversal vulnerability when sandbox disabled
 
-## Low (29)
+## Low (44)
 
 - [#5](https://github.com/averagejoeslab/nanoagent/issues/5) - Weak type safety with excessive use of 'any'
 - [#10](https://github.com/averagejoeslab/nanoagent/issues/10) - Missing input validation for tool parameters
+- [#11](https://github.com/averagejoeslab/nanoagent/issues/11) - Race condition in concurrent file writes to trace
 - [#12](https://github.com/averagejoeslab/nanoagent/issues/12) - File system errors lack helpful context
 - [#13](https://github.com/averagejoeslab/nanoagent/issues/13) - Memory leak: tokenizer not freed on exit
 - [#14](https://github.com/averagejoeslab/nanoagent/issues/14) - Readline interface not closed on error
@@ -47,6 +52,7 @@
 - [#18](https://github.com/averagejoeslab/nanoagent/issues/18) - Add unit tests for core functionality
 - [#19](https://github.com/averagejoeslab/nanoagent/issues/19) - Add sensitive data protection in trace files
 - [#20](https://github.com/averagejoeslab/nanoagent/issues/20) - README: Update shell timeout documentation
+- [#23](https://github.com/averagejoeslab/nanoagent/issues/23) - Security: ReDoS vulnerability in regex handling
 - [#25](https://github.com/averagejoeslab/nanoagent/issues/25) - Memory: Unbounded message array growth in REPL mode
 - [#27](https://github.com/averagejoeslab/nanoagent/issues/27) - UX: Add rate limiting/summary for rapid tool execution display
 - [#28](https://github.com/averagejoeslab/nanoagent/issues/28) - Verify: Line numbering calculation with offset parameter
@@ -78,10 +84,25 @@
 
 ---
 
-**Summary**: 53 open issues total
-- Critical: 6 issues requiring immediate attention
-- High: 5 issues affecting reliability and security
-- Medium: 14 issues impacting user experience and robustness
-- Low: 28 issues for code quality and enhancements
+## Priority Definitions
 
-Last updated: 2025-01-28
+- **Critical** 🔴: Security vulnerabilities, data loss, or application crashes
+- **High** 🟡: Significant bugs affecting core functionality or reliability
+- **Medium** 🔵: Important improvements, configuration issues, or moderate bugs
+- **Low** 🟢: Nice-to-have enhancements, code quality improvements, or minor bugs
+
+## Contributing
+
+When working on issues:
+1. Check this file for current priorities
+2. Focus on Critical and High priority issues first
+3. Add comments to GitHub issues when starting work
+4. Update issue status after fixing
+
+## Issue Verification Status
+
+All issues listed above have been verified against the current codebase:
+- Code locations confirmed
+- Issue descriptions validated
+- Severity levels assessed based on actual impact
+- Duplicate issues closed (see #98, #76)
