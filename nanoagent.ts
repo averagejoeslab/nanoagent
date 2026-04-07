@@ -400,7 +400,7 @@ const TOOLS: Record<string, Tool> = {
     },
   },
   recall: {
-    desc: "Search episodic memory for relevant past conversations. Use this to find information from earlier in the session that is no longer in the working memory buffer. Craft a search query that describes what you'\''\'\'''\''re looking for.",
+    desc: "Search episodic memory when automatic recall is insufficient or you need to query with different terms. Searches older conversations outside the working buffer. Craft a specific search query.",
     params: ["query"],
     fn: async (args) => {
       // Access evicted turns from global state
