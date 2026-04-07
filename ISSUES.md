@@ -1,11 +1,6 @@
 # Open Issues
 
-This document tracks all open issues in the nanoagent repository, organized by priority level.
-
-**Last Updated**: 2024-12-19
-**Total Open Issues**: 69
-
----
+This document tracks all currently open issues for the nanoagent project, organized by priority.
 
 ## Critical (6)
 
@@ -16,7 +11,7 @@ This document tracks all open issues in the nanoagent repository, organized by p
 - [#94](https://github.com/averagejoeslab/nanoagent/issues/94) - Missing tsconfig.json - No strict type checking enforced
 - [#97](https://github.com/averagejoeslab/nanoagent/issues/97) - Command injection in path parameters
 
-## High (5)
+## High (4)
 
 - [#46](https://github.com/averagejoeslab/nanoagent/issues/46) - Race Condition in Sandbox Health Check and Recreation
 - [#47](https://github.com/averagejoeslab/nanoagent/issues/47) - Silent Failures in Tool Execution - grep and loadTrace
@@ -24,8 +19,10 @@ This document tracks all open issues in the nanoagent repository, organized by p
 - [#89](https://github.com/averagejoeslab/nanoagent/issues/89) - API response structure not validated before use
 - [#95](https://github.com/averagejoeslab/nanoagent/issues/95) - No API timeout causes application hangs
 
-## Medium (15)
+## Medium (11)
 
+- [#11](https://github.com/averagejoeslab/nanoagent/issues/11) - Race condition in concurrent file writes to trace
+- [#25](https://github.com/averagejoeslab/nanoagent/issues/25) - Unbounded message array growth in REPL mode
 - [#48](https://github.com/averagejoeslab/nanoagent/issues/48) - Environment Variable Naming Inconsistency - DISABLE_SANDBOX vs SANDBOX
 - [#49](https://github.com/averagejoeslab/nanoagent/issues/49) - Missing Docker Availability Check
 - [#50](https://github.com/averagejoeslab/nanoagent/issues/50) - Container Not Cleaned Up on Sandbox Start Failure
@@ -34,16 +31,13 @@ This document tracks all open issues in the nanoagent repository, organized by p
 - [#75](https://github.com/averagejoeslab/nanoagent/issues/75) - Token counting inconsistency in trace loading
 - [#85](https://github.com/averagejoeslab/nanoagent/issues/85) - Inconsistent Error Message Format
 - [#88](https://github.com/averagejoeslab/nanoagent/issues/88) - Missing Error Handling in Trace Save Operations
-- [#90](https://github.com/averagejoeslab/nanoagent/issues/90) - Dockerfile security improvements needed
 - [#91](https://github.com/averagejoeslab/nanoagent/issues/91) - Synchronous Docker operations block event loop
 - [#96](https://github.com/averagejoeslab/nanoagent/issues/96) - Path traversal vulnerability when sandbox disabled
-- [#100](https://github.com/averagejoeslab/nanoagent/issues/100) - Embeddings model download on first run not documented
 
-## Low (43)
+## Low (28)
 
 - [#5](https://github.com/averagejoeslab/nanoagent/issues/5) - Weak type safety with excessive use of 'any'
 - [#10](https://github.com/averagejoeslab/nanoagent/issues/10) - Missing input validation for tool parameters
-- [#11](https://github.com/averagejoeslab/nanoagent/issues/11) - Race condition in concurrent file writes to trace
 - [#12](https://github.com/averagejoeslab/nanoagent/issues/12) - File system errors lack helpful context
 - [#13](https://github.com/averagejoeslab/nanoagent/issues/13) - Memory leak: tokenizer not freed on exit
 - [#14](https://github.com/averagejoeslab/nanoagent/issues/14) - Readline interface not closed on error
@@ -54,7 +48,6 @@ This document tracks all open issues in the nanoagent repository, organized by p
 - [#19](https://github.com/averagejoeslab/nanoagent/issues/19) - Add sensitive data protection in trace files
 - [#20](https://github.com/averagejoeslab/nanoagent/issues/20) - README: Update shell timeout documentation
 - [#23](https://github.com/averagejoeslab/nanoagent/issues/23) - Security: ReDoS vulnerability in regex handling
-- [#25](https://github.com/averagejoeslab/nanoagent/issues/25) - Memory: Unbounded message array growth in REPL mode
 - [#27](https://github.com/averagejoeslab/nanoagent/issues/27) - UX: Add rate limiting/summary for rapid tool execution display
 - [#28](https://github.com/averagejoeslab/nanoagent/issues/28) - Verify: Line numbering calculation with offset parameter
 - [#30](https://github.com/averagejoeslab/nanoagent/issues/30) - Add configuration file support (.nanoagent.config.json)
@@ -83,46 +76,10 @@ This document tracks all open issues in the nanoagent repository, organized by p
 - [#81](https://github.com/averagejoeslab/nanoagent/issues/81) - Missing error context and stack traces in fatal error handler
 - [#87](https://github.com/averagejoeslab/nanoagent/issues/87) - Documentation References Non-Existent Files
 - [#99](https://github.com/averagejoeslab/nanoagent/issues/99) - Documentation missing for semantic memory recall feature
+- [#100](https://github.com/averagejoeslab/nanoagent/issues/100) - Embeddings model download on first run not documented
 
 ---
 
-## Priority Definitions
+**Total Open Issues: 70**
 
-- **Critical** 🔴: Security vulnerabilities, data loss, or application crashes
-- **High** 🟡: Significant bugs affecting core functionality or reliability
-- **Medium** 🔵: Important improvements, configuration issues, or moderate bugs
-- **Low** 🟢: Nice-to-have enhancements, code quality improvements, or minor bugs
-
-## Contributing
-
-When working on issues:
-1. Check this file for current priorities
-2. Focus on Critical and High priority issues first
-3. Add comments to GitHub issues when starting work
-4. Update issue status after fixing
-
-## Issue Verification Status
-
-All issues listed above have been verified against the current codebase (2024-12-19):
-- 12+ issues verified by reading actual code locations
-- Code locations confirmed for all Critical and High priority issues
-- Issue descriptions validated against current implementation
-- Severity levels assessed based on actual impact
-- 2 new issues created from code review findings (#99, #100)
-
-### Verification Log
-
-Issues verified by direct code inspection:
-- ✅ #97 - Command injection confirmed at line 242
-- ✅ #96 - Path traversal vulnerability confirmed (no validation in non-sandbox mode)
-- ✅ #95 - API timeout missing confirmed at lines 603-621
-- ✅ #94 - tsconfig.json confirmed missing
-- ✅ #93 - EOF injection confirmed at line 268
-- ✅ #91 - Synchronous Docker operations confirmed at lines 74-105
-- ✅ #89 - API response validation missing confirmed at lines 619-620
-- ✅ #87 - Non-existent files referenced in SANDBOX.md confirmed
-- ✅ #74 - Uncaught promise rejections confirmed at lines 204-211
-- ✅ #65 - No max iteration limit confirmed at line 632
-- ✅ #46 - Race condition in sandbox health check confirmed at lines 215-220
-- ✅ #45 - Event listener memory leak confirmed at lines 202-211
-- ✅ #80 - API key validation insufficient confirmed at line 685
+Last updated: 2024-12-19 (automated via issue reconciliation workflow)
