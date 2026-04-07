@@ -11,7 +11,7 @@ import { randomBytes } from "node:crypto";
 import * as readline from "node:readline";
 import { Tiktoken } from "js-tiktoken/lite";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
-import { pipeline } from '/transformers';
+import { pipeline } from '@xenova/transformers';
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -81,10 +81,11 @@ class Sandbox {
     }
 
     const dockerArgs = [
-      "docker", "run", "-d", "--rm", "--name", name,
+      "run", "-d", "--rm", "--name", name,
       // Security
       "--cap-drop", "ALL",
       "--security-opt", "no-new-privileges",
+      "--security-opt", "seccomp=default",
       "--network", "none",
       // Filesystem
       "--read-only",
@@ -175,7 +176,7 @@ class Sandbox {
     if (!this.containerId) return false;
 
     try {
-      const result = execSync(`docker inspect -f '\''\'\'''\''{{.State.Running}}'\''\'\'''\'' ${this.containerId}`, {
+      const result = execSync(`docker inspect -f '{{.State.Running}}' ${this.containerId}`, {
         encoding: "utf-8",
         timeout: 1000,
       }).trim();
@@ -263,8 +264,8 @@ const TOOLS: Record<string, Tool> = {
         return "ok";
       }
       
-      const escaped = args.content.replace(/'\''\'\'''\''/g, "'\''\'\'''\''\\'\''\'\'''\'''\''\'\'''\''");
-      const result = await sandbox.exec(`cat > "${args.path}" << '\''\'\'''\''EOF'\''\'\'''\''\n${escaped}\nEOF`);
+      const escaped = args.content.replace(/'/g, "'\\''");
+      const result = await sandbox.exec(`cat > "${args.path}" << 'EOF'\n${escaped}\nEOF`);
       
       if (result.exitCode !== 0) {
         return `error: ${result.stderr || "Failed to write file"}`;
@@ -305,8 +306,8 @@ const TOOLS: Record<string, Tool> = {
       }
       
       const newContent = args.all ? content.replaceAll(args.old, args.new) : content.replace(args.old, args.new);
-      const escapedContent = newContent.replace(/'\''\'\'''\''/g, "'\''\'\'''\''\\'\''\'\'''\'''\''\'\'''\''");
-      const writeResult = await sandbox.exec(`cat > "${args.path}" << '\''\'\'''\''EOF'\''\'\'''\''\n${escapedContent}\nEOF`);
+      const escapedContent = newContent.replace(/'/g, "'\\''");
+      const writeResult = await sandbox.exec(`cat > "${args.path}" << 'EOF'\n${escapedContent}\nEOF`);
       
       if (writeResult.exitCode !== 0) {
         return `error: ${writeResult.stderr || "Failed to write file"}`;
@@ -399,24 +400,6 @@ const TOOLS: Record<string, Tool> = {
       return result.stdout || "(empty)";
     },
   },
-  recall: {
-    desc: "Search episodic memory when automatic recall is insufficient or you need to query with different terms. Searches older conversations outside the working buffer. Craft a specific search query.",
-    params: ["query"],
-    fn: async (args) => {
-      // Access evicted turns from global state
-      const evicted = (globalThis as any).__nanoagent_evicted_turns || [];
-      if (!evicted.length) {
-        return "No episodic memories available yet (all conversation is still in working memory).";
-      }
-      
-      const result = await recallMemories(args.query, evicted);
-      if (!result) {
-        return "No relevant memories found for this query.";
-      }
-      
-      return result;
-    },
-  },
 };
 
 // ─── TOOL EXECUTION ──────────────────────────────────────────────────────────
@@ -464,9 +447,9 @@ function countTokens(text: string): number {
 async function embed(text: string): Promise<number[]> {
   if (!embedder) {
     console.log(`${ANSI.dim}Loading embedding model (first time only)...${ANSI.reset}`);
-    embedder = await pipeline('\''\'\'''\''feature-extraction'\''\'\'''\'', '\''\'\'''\''Xenova/all-MiniLM-L6-v2'\''\'\'''\'');
+    embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
   }
-  const output = await embedder(text, { pooling: '\''\'\'''\''mean'\''\'\'''\'', normalize: true });
+  const output = await embedder(text, { pooling: 'mean', normalize: true });
   return Array.from(output.data);
 }
 
@@ -484,7 +467,7 @@ async function saveToTrace(turn: { timestamp: string; user: string; assistant: a
   await mkdir(".nanoagent", { recursive: true });
   
   // Generate embedding for the turn
-  const text = turn.user + '\''\'\'''\'' '\''\'\'''\'' + JSON.stringify(turn.assistant);
+  const text = turn.user + ' ' + JSON.stringify(turn.assistant);
   const embedding = await embed(text);
   
   const line = JSON.stringify({ ...turn, embedding }) + "\n";
@@ -594,10 +577,6 @@ async function loadTrace(currentQuery?: string): Promise<{ messages: Message[]; 
 
     // Part 2: Episodic recall (evicted turns via semantic search)
     const evictedTurns = allTurns.filter((_, idx) => !bufferIndices.has(idx));
-    
-    // Store evicted turns globally so the recall tool can access them
-    (globalThis as any).__nanoagent_evicted_turns = evictedTurns;
-    
     const recalledMemories = currentQuery
       ? await recallMemories(currentQuery, evictedTurns)
       : "";
