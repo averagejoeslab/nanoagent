@@ -85,7 +85,6 @@ class Sandbox {
       // Security
       "--cap-drop", "ALL",
       "--security-opt", "no-new-privileges",
-      "--security-opt", "seccomp=default",
       "--network", "none",
       // Filesystem
       "--read-only",
