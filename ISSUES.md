@@ -2,8 +2,8 @@
 
 This document tracks all open issues in the nanoagent repository, organized by priority level.
 
-**Last Updated**: 2024-04-07  
-**Total Open Issues**: 67
+**Last Updated**: 2024-12-19
+**Total Open Issues**: 69
 
 ---
 
@@ -16,7 +16,7 @@ This document tracks all open issues in the nanoagent repository, organized by p
 - [#94](https://github.com/averagejoeslab/nanoagent/issues/94) - Missing tsconfig.json - No strict type checking enforced
 - [#97](https://github.com/averagejoeslab/nanoagent/issues/97) - Command injection in path parameters
 
-## High (4)
+## High (5)
 
 - [#46](https://github.com/averagejoeslab/nanoagent/issues/46) - Race Condition in Sandbox Health Check and Recreation
 - [#47](https://github.com/averagejoeslab/nanoagent/issues/47) - Silent Failures in Tool Execution - grep and loadTrace
@@ -24,7 +24,7 @@ This document tracks all open issues in the nanoagent repository, organized by p
 - [#89](https://github.com/averagejoeslab/nanoagent/issues/89) - API response structure not validated before use
 - [#95](https://github.com/averagejoeslab/nanoagent/issues/95) - No API timeout causes application hangs
 
-## Medium (13)
+## Medium (15)
 
 - [#48](https://github.com/averagejoeslab/nanoagent/issues/48) - Environment Variable Naming Inconsistency - DISABLE_SANDBOX vs SANDBOX
 - [#49](https://github.com/averagejoeslab/nanoagent/issues/49) - Missing Docker Availability Check
@@ -37,8 +37,9 @@ This document tracks all open issues in the nanoagent repository, organized by p
 - [#90](https://github.com/averagejoeslab/nanoagent/issues/90) - Dockerfile security improvements needed
 - [#91](https://github.com/averagejoeslab/nanoagent/issues/91) - Synchronous Docker operations block event loop
 - [#96](https://github.com/averagejoeslab/nanoagent/issues/96) - Path traversal vulnerability when sandbox disabled
+- [#100](https://github.com/averagejoeslab/nanoagent/issues/100) - Embeddings model download on first run not documented
 
-## Low (44)
+## Low (43)
 
 - [#5](https://github.com/averagejoeslab/nanoagent/issues/5) - Weak type safety with excessive use of 'any'
 - [#10](https://github.com/averagejoeslab/nanoagent/issues/10) - Missing input validation for tool parameters
@@ -81,6 +82,7 @@ This document tracks all open issues in the nanoagent repository, organized by p
 - [#78](https://github.com/averagejoeslab/nanoagent/issues/78) - Performance - Inefficient token budget loading for large traces
 - [#81](https://github.com/averagejoeslab/nanoagent/issues/81) - Missing error context and stack traces in fatal error handler
 - [#87](https://github.com/averagejoeslab/nanoagent/issues/87) - Documentation References Non-Existent Files
+- [#99](https://github.com/averagejoeslab/nanoagent/issues/99) - Documentation missing for semantic memory recall feature
 
 ---
 
@@ -101,8 +103,26 @@ When working on issues:
 
 ## Issue Verification Status
 
-All issues listed above have been verified against the current codebase:
-- Code locations confirmed
-- Issue descriptions validated
+All issues listed above have been verified against the current codebase (2024-12-19):
+- 12+ issues verified by reading actual code locations
+- Code locations confirmed for all Critical and High priority issues
+- Issue descriptions validated against current implementation
 - Severity levels assessed based on actual impact
-- Duplicate issues closed (see #98, #76)
+- 2 new issues created from code review findings (#99, #100)
+
+### Verification Log
+
+Issues verified by direct code inspection:
+- ✅ #97 - Command injection confirmed at line 242
+- ✅ #96 - Path traversal vulnerability confirmed (no validation in non-sandbox mode)
+- ✅ #95 - API timeout missing confirmed at lines 603-621
+- ✅ #94 - tsconfig.json confirmed missing
+- ✅ #93 - EOF injection confirmed at line 268
+- ✅ #91 - Synchronous Docker operations confirmed at lines 74-105
+- ✅ #89 - API response validation missing confirmed at lines 619-620
+- ✅ #87 - Non-existent files referenced in SANDBOX.md confirmed
+- ✅ #74 - Uncaught promise rejections confirmed at lines 204-211
+- ✅ #65 - No max iteration limit confirmed at line 632
+- ✅ #46 - Race condition in sandbox health check confirmed at lines 215-220
+- ✅ #45 - Event listener memory leak confirmed at lines 202-211
+- ✅ #80 - API key validation insufficient confirmed at line 685
