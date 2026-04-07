@@ -11,7 +11,7 @@ import { randomBytes } from "node:crypto";
 import * as readline from "node:readline";
 import { Tiktoken } from "js-tiktoken/lite";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
-import Anthropic from "@anthropic-ai/sdk";
+import { pipeline } from '@xenova/transformers';
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -438,18 +438,19 @@ function buildToolSchema() {
 
 // ─── MEMORY ──────────────────────────────────────────────────────────────────
 const tokenizer = new Tiktoken(cl100k_base);
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+let embedder: any = null;
 
 function countTokens(text: string): number {
   return tokenizer.encode(text).length;
 }
 
 async function embed(text: string): Promise<number[]> {
-  const response = await anthropic.embeddings.create({
-    model: "voyage-3",
-    input: text,
-  });
-  return response.data[0].embedding;
+  if (!embedder) {
+    console.log(`${ANSI.dim}Loading embedding model (first time only)...${ANSI.reset}`);
+    embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+  }
+  const output = await embedder(text, { pooling: 'mean', normalize: true });
+  return Array.from(output.data);
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
