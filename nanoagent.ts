@@ -11,7 +11,7 @@ import { randomBytes } from "node:crypto";
 import * as readline from "node:readline";
 import { Tiktoken } from "js-tiktoken/lite";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
-import { pipeline } from '\''\'\'''\''@xenova/transformers'\''\'\'''\'';
+import { pipeline } from '/transformers';
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API_URL = "https://api.anthropic.com/v1/messages";
