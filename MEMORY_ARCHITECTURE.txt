@@ -1,0 +1,76 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    NANOAGENT EPISODIC MEMORY SYSTEM                        ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  NEW USER QUERY: "What was that CSV parser we worked on?"                  │
+└────────────────┬────────────────────────────────────────────────────────────┘
+                 │
+                 ├─────────────────┬────────────────────────┐
+                 ▼                 ▼                        ▼
+        ┌────────────────┐  ┌──────────────┐    ┌──────────────────────┐
+        │ WORKING MEMORY │  │   SEMANTIC   │    │  EPISODIC STORAGE    │
+        │    BUFFER      │  │   RECALL     │    │  (.nanoagent/trace)  │
+        │                │  │              │    │                      │
+        │  Recent 20     │  │  1. Embed    │◄───│  All 100+ turns      │
+        │  turns         │  │     query    │    │  with embeddings     │
+        │  (~190k tokens)│  │              │    │                      │
+        │                │  │  2. Compute  │    │  Turn 1: CSV parser  │
+        │  Turn 98-100   │  │     cosine   │    │  Turn 5: React form  │
+        │                │  │     similarity    │  Turn 12: Docker     │
+        └────────┬───────┘  │              │    │  Turn 24: Database   │
+                 │          │  3. Top K=10 │    │  ...                 │
+                 │          │     candidates    │  Turn 97: (evicted)  │
+                 │          └────────┬─────┘    └──────────────────────┘
+                 │                   │
+                 │          ┌────────▼──────────────┐
+                 │          │  LLM RERANKING        │
+                 │          │                       │
+                 │          │  "Here are the 10     │
+                 │          │   most similar turns. │
+                 │          │   Extract relevant    │
+                 │          │   info for query..."  │
+                 │          │                       │
+                 │          │  Output: "On Jan 1,   │
+                 │          │  we created a CSV     │
+                 │          │  parser using pandas" │
+                 │          └───────────┬───────────┘
+                 │                      │
+                 │          ┌───────────▼───────────┐
+                 └─────────►│  SYSTEM PROMPT        │
+                            │                       │
+                            │  "Concise assistant   │
+                            │                       │
+                            │  ## Recalled Memory:  │
+                            │  On Jan 1, we created │
+                            │  a CSV parser..."     │
+                            └───────────┬───────────┘
+                                        │
+                            ┌───────────▼───────────┐
+                            │  FINAL RESPONSE       │
+                            │                       │
+                            │  "Yes! We created a   │
+                            │  CSV parser using the │
+                            │  pandas library..."   │
+                            └───────────────────────┘
+
+KEY METRICS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Working Buffer:     20/100 turns  (token-limited)
+Evicted Turns:      80/100 turns  (semantically searchable)
+Context Window:     200,000 tokens
+Memory Budget:      189,500 tokens (buffer)
+Embedding Model:    Xenova/all-MiniLM-L6-v2 (384 dimensions)
+Similarity Metric:  Cosine similarity
+Top K Candidates:   10
+Storage:            .nanoagent/trace.jsonl (one turn per line)
+
+BENEFITS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Unlimited conversation history (not limited by context window)
+✓ Semantic retrieval (finds relevant info even with different wording)
+✓ Two-stage memory (buffer for recency, search for relevance)
+✓ Automatic eviction and recall (no manual memory management)
+✓ Persistent across sessions (stored in .nanoagent/trace.jsonl)
