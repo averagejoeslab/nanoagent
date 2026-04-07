@@ -11,6 +11,7 @@ import { randomBytes } from "node:crypto";
 import * as readline from "node:readline";
 import { Tiktoken } from "js-tiktoken/lite";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
+import Anthropic from "@anthropic-ai/sdk";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -437,59 +438,162 @@ function buildToolSchema() {
 
 // ─── MEMORY ──────────────────────────────────────────────────────────────────
 const tokenizer = new Tiktoken(cl100k_base);
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 function countTokens(text: string): number {
   return tokenizer.encode(text).length;
 }
 
+async function embed(text: string): Promise<number[]> {
+  const response = await anthropic.embeddings.create({
+    model: "voyage-3",
+    input: text,
+  });
+  return response.data[0].embedding;
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
 async function saveToTrace(turn: { timestamp: string; user: string; assistant: any }) {
   await mkdir(".nanoagent", { recursive: true });
-  const line = JSON.stringify(turn) + "\n";
+  
+  // Generate embedding for the turn
+  const text = turn.user + ' ' + JSON.stringify(turn.assistant);
+  const embedding = await embed(text);
+  
+  const line = JSON.stringify({ ...turn, embedding }) + "\n";
   await Bun.write(TRACE_FILE, line, { append: true });
 }
 
-async function loadTrace(): Promise<{ messages: Message[]; stats: { total: number; loaded: number; tokens: number } }> {
+async function recallMemories(query: string, evictedTurns: any[]): Promise<string> {
+  if (!evictedTurns.length || !evictedTurns.some((t) => t.embedding)) {
+    return "";
+  }
+
+  // Stage 1: Semantic search for top candidates
+  const queryVec = await embed(query);
+  const K = 10;
+
+  const candidates = evictedTurns
+    .filter((t) => t.embedding)
+    .map((turn) => ({
+      turn,
+      score: cosineSimilarity(queryVec, turn.embedding),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, K)
+    .map((c) => c.turn);
+
+  if (!candidates.length) return "";
+
+  // Stage 2: LLM rerank and summarize
+  const candidatesText = candidates
+    .map((turn, idx) => {
+      const date = new Date(turn.timestamp).toLocaleString();
+      let assistantText = "";
+      if (typeof turn.assistant === "string") {
+        assistantText = turn.assistant;
+      } else if (Array.isArray(turn.assistant)) {
+        assistantText = turn.assistant
+          .map((block: any) => {
+            if (block.type === "text") return block.text;
+            if (block.type === "tool_use") return `[Used tool: ${block.name}]`;
+            return "";
+          })
+          .filter(Boolean)
+          .join("\n");
+      }
+
+      return `[Turn ${idx}] ${date}\nUser: ${turn.user}\nAssistant: ${assistantText}`;
+    })
+    .join("\n\n---\n\n");
+
+  const rerankPrompt = `You are extracting relevant memories for a coding assistant.
+
+Current user query: "${query}"
+
+Here are candidate memories from past conversations (full turns with context):
+
+${candidatesText}
+
+Your task:
+1. Identify which turns contain information relevant to the current query
+2. Extract and summarize the key information from those relevant turns
+3. Return a concise memory summary that would help answer the query
+
+Return format:
+## What I remember from earlier:
+
+[One paragraph or a few bullet points summarizing the relevant information, with dates when important]
+
+Do NOT return turn indices. Return the actual relevant information extracted and summarized from the turns.`;
+
+  const response = await callLLM(
+    [{ role: "user", content: rerankPrompt }],
+    "You extract and summarize relevant information from past conversations."
+  );
+
+  return response.content[0].text.trim();
+}
+
+async function loadTrace(currentQuery?: string): Promise<{ messages: Message[]; recalledMemories: string; stats: { total: number; loaded: number; tokens: number } }> {
   try {
     const content = await readFile(TRACE_FILE, "utf-8");
     const lines = content.trim().split("\n");
-    
+    const allTurns = lines.map((line) => JSON.parse(line));
+
+    // Part 1: Working memory buffer (recent turns)
     const messages: Message[] = [];
     let tokens = 0;
     let loaded = 0;
-    
-    // Load from most recent backwards until budget exceeded
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const turn = JSON.parse(lines[i]);
-      
-      // Count tokens for this turn
+
+    for (let i = allTurns.length - 1; i >= 0; i--) {
+      const turn = allTurns[i];
       const userTokens = countTokens(turn.user);
       const assistantTokens = countTokens(JSON.stringify(turn.assistant));
       const turnTokens = userTokens + assistantTokens;
-      
-      // Check if adding this turn would exceed budget
-      if (tokens + turnTokens > MEMORY_BUDGET) {
-        break; // Stop loading, we've hit the limit
-      }
-      
-      // Add to beginning (since we're going backwards)
+
+      if (tokens + turnTokens > MEMORY_BUDGET) break;
+
       messages.unshift({ role: "assistant", content: turn.assistant });
       messages.unshift({ role: "user", content: turn.user });
       tokens += turnTokens;
       loaded++;
     }
-    
-    return { 
-      messages, 
-      stats: { 
-        total: lines.length, 
-        loaded, 
-        tokens 
-      } 
+
+    // Get indices of buffered turns
+    const bufferIndices = new Set(
+      Array.from({ length: loaded }, (_, i) => allTurns.length - loaded + i)
+    );
+
+    // Part 2: Episodic recall (evicted turns via semantic search)
+    const evictedTurns = allTurns.filter((_, idx) => !bufferIndices.has(idx));
+    const recalledMemories = currentQuery
+      ? await recallMemories(currentQuery, evictedTurns)
+      : "";
+
+    return {
+      messages,
+      recalledMemories,
+      stats: {
+        total: allTurns.length,
+        loaded,
+        tokens,
+      },
     };
   } catch {
-    return { 
-      messages: [], 
-      stats: { total: 0, loaded: 0, tokens: 0 } 
+    return {
+      messages: [],
+      recalledMemories: "",
+      stats: { total: 0, loaded: 0, tokens: 0 },
     };
   }
 }
@@ -587,8 +691,10 @@ async function main() {
   
   // One-off mode: run single prompt and exit
   if (oneOffPrompt) {
-    const { messages } = await loadTrace();
-    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}${USE_SANDBOX ? "\n\nSECURITY: All tools run in sandboxed Docker container (no network, isolated filesystem, 512MB RAM, 1 CPU)." : ""}`;
+    const { messages, recalledMemories } = await loadTrace(oneOffPrompt);
+    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}${USE_SANDBOX ? "\n\nSECURITY: All tools run in sandboxed Docker container (no network, isolated filesystem, 512MB RAM, 1 CPU)." : ""}
+
+${recalledMemories}`;
     
     messages.push({ role: "user", content: oneOffPrompt });
     await agenticLoop(messages, systemPrompt);
@@ -642,11 +748,15 @@ ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}${USE
       continue;
     }
     
-    // Recompute working buffer from episodic trace on every turn
-    const { messages } = await loadTrace();
+    // Recompute working buffer + recall memories on every turn
+    const { messages, recalledMemories } = await loadTrace(input);
+    
+    const systemPromptWithMemories = `${systemPrompt}
+
+${recalledMemories}`;
     
     messages.push({ role: "user", content: input });
-    await agenticLoop(messages, systemPrompt);
+    await agenticLoop(messages, systemPromptWithMemories);
     
     // Save this turn to trace (episodic memory)
     await saveToTrace({
