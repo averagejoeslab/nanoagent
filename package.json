@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
     "js-tiktoken": "^1.0.21"
   }
 }
