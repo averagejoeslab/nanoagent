@@ -85,8 +85,6 @@ class Sandbox {
       // Security
       "--cap-drop", "ALL",
       "--security-opt", "no-new-privileges",
-      "--security-opt", "seccomp=default",
-      "--network", "none",
       // Filesystem
       "--read-only",
       "--tmpfs", "/tmp:rw,noexec,nosuid,size=100m",
@@ -698,9 +696,9 @@ async function main() {
     // Pre-load embedding model for one-off mode
     await initializeEmbedder();
     const { messages, recalledMemories } = await loadTrace(oneOffPrompt);
-    const systemPrompt = \`Concise coding assistant. cwd: \${process.cwd()}\${USE_SANDBOX ? "\\n\\nSECURITY: All tools run in sandboxed Docker container (no network, isolated filesystem, 512MB RAM, 1 CPU)." : ""}
+    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}${USE_SANDBOX ? "\n\nSECURITY: All tools run in sandboxed Docker container (no network, isolated filesystem, 512MB RAM, 1 CPU)." : ""}
 
-\${recalledMemories}\`;
+${recalledMemories}`;
     
     messages.push({ role: "user", content: oneOffPrompt });
     await agenticLoop(messages, systemPrompt);
@@ -718,7 +716,10 @@ async function main() {
   // Pre-load embedding model before showing banner
   await initializeEmbedder();
   
-  console.log(\`
+  console.log(`
+${ANSI.bold}${ANSI.cyan}nanoagent${USE_SANDBOX ? " 🐳" : ""}${ANSI.reset}
+${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}${USE_SANDBOX ? ` | ${ANSI.green}sandboxed${ANSI.reset}` : ""}
+`);
 
   // Load initial state to show stats
   const initialLoad = await loadTrace();
