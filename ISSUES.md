@@ -1,85 +1,107 @@
 # Open Issues
 
-This document tracks all currently open issues for the nanoagent project, organized by priority.
+Last updated: 2025-04-08 (Comprehensive Self-Review Completed)
 
-## Critical (6)
+## Critical (5)
 
-- [#45](https://github.com/averagejoeslab/nanoagent/issues/45) - Memory Leak - Event Listeners Added Repeatedly
-- [#74](https://github.com/averagejoeslab/nanoagent/issues/74) - Uncaught promise rejections in signal handlers
-- [#80](https://github.com/averagejoeslab/nanoagent/issues/80) - API Key Format Validation Missing
-- [#93](https://github.com/averagejoeslab/nanoagent/issues/93) - EOF Injection Vulnerability in Write Tool - Sandbox Escape
-- [#94](https://github.com/averagejoeslab/nanoagent/issues/94) - Missing tsconfig.json - No strict type checking enforced
-- [#97](https://github.com/averagejoeslab/nanoagent/issues/97) - Command injection in path parameters
+- #97 - [Nanoagent Review] CRITICAL: Command injection in path parameters
+- #94 - [Nanoagent Review] CRITICAL: Missing tsconfig.json - No strict type checking enforced
+- #93 - [Nanoagent Review] CRITICAL: EOF Injection Vulnerability in Write Tool - Sandbox Escape
+- #80 - [Nanoagent Review] CRITICAL: API Key Format Validation Missing
+- #74 - [Nanoagent Review] CRITICAL: Uncaught promise rejections in signal handlers
 
-## High (4)
+## High (5)
 
-- [#46](https://github.com/averagejoeslab/nanoagent/issues/46) - Race Condition in Sandbox Health Check and Recreation
-- [#47](https://github.com/averagejoeslab/nanoagent/issues/47) - Silent Failures in Tool Execution - grep and loadTrace
-- [#65](https://github.com/averagejoeslab/nanoagent/issues/65) - Add max iteration limit to prevent infinite agentic loops
-- [#89](https://github.com/averagejoeslab/nanoagent/issues/89) - API response structure not validated before use
-- [#95](https://github.com/averagejoeslab/nanoagent/issues/95) - No API timeout causes application hangs
+- #95 - [Nanoagent Review] HIGH: No API timeout causes application hangs
+- #89 - [Nanoagent Review] HIGH: API response structure not validated before use
+- #65 - [Nanoagent Review] HIGH: Add max iteration limit to prevent infinite agentic loops
+- #47 - [Nanoagent Review] HIGH: Silent Failures in Tool Execution - grep and loadTrace
+- #46 - [Nanoagent Review] HIGH: Race Condition in Sandbox Health Check and Recreation
 
-## Medium (11)
+## Medium (12)
 
-- [#11](https://github.com/averagejoeslab/nanoagent/issues/11) - Race condition in concurrent file writes to trace
-- [#25](https://github.com/averagejoeslab/nanoagent/issues/25) - Unbounded message array growth in REPL mode
-- [#48](https://github.com/averagejoeslab/nanoagent/issues/48) - Environment Variable Naming Inconsistency - DISABLE_SANDBOX vs SANDBOX
-- [#49](https://github.com/averagejoeslab/nanoagent/issues/49) - Missing Docker Availability Check
-- [#50](https://github.com/averagejoeslab/nanoagent/issues/50) - Container Not Cleaned Up on Sandbox Start Failure
-- [#66](https://github.com/averagejoeslab/nanoagent/issues/66) - Move API key validation to startup
-- [#67](https://github.com/averagejoeslab/nanoagent/issues/67) - Make hardcoded timeouts configurable
-- [#75](https://github.com/averagejoeslab/nanoagent/issues/75) - Token counting inconsistency in trace loading
-- [#85](https://github.com/averagejoeslab/nanoagent/issues/85) - Inconsistent Error Message Format
-- [#88](https://github.com/averagejoeslab/nanoagent/issues/88) - Missing Error Handling in Trace Save Operations
-- [#91](https://github.com/averagejoeslab/nanoagent/issues/91) - Synchronous Docker operations block event loop
-- [#96](https://github.com/averagejoeslab/nanoagent/issues/96) - Path traversal vulnerability when sandbox disabled
+- #105 - [Nanoagent Review] Comprehensive Documentation Updates Needed
+- #104 - [Nanoagent Review] MEDIUM: No prominent warning when sandbox is disabled in REPL mode
+- #102 - [Nanoagent Review] MEDIUM: executeTool lacks detailed error context
+- #101 - [Nanoagent Review] MEDIUM: File write operations are not atomic
+- #96 - [Nanoagent Review] MEDIUM: Path traversal vulnerability when sandbox disabled
+- #91 - [Nanoagent Review] MEDIUM: Synchronous Docker operations block event loop
+- #88 - [Nanoagent Review] MEDIUM: Missing Error Handling in Trace Save Operations
+- #85 - [Nanoagent Review] MEDIUM: Inconsistent Error Message Format
+- #75 - [Nanoagent Review] MEDIUM: Token counting inconsistency in trace loading
+- #67 - [Nanoagent Review] MEDIUM: Make hardcoded timeouts configurable
+- #66 - [Nanoagent Review] MEDIUM: Move API key validation to startup
+- #50 - [Nanoagent Review] MEDIUM: Container Not Cleaned Up on Sandbox Start Failure
+- #49 - [Nanoagent Review] MEDIUM: Missing Docker Availability Check
 
-## Low (28)
+## Low (20)
 
-- [#5](https://github.com/averagejoeslab/nanoagent/issues/5) - Weak type safety with excessive use of 'any'
-- [#10](https://github.com/averagejoeslab/nanoagent/issues/10) - Missing input validation for tool parameters
-- [#12](https://github.com/averagejoeslab/nanoagent/issues/12) - File system errors lack helpful context
-- [#13](https://github.com/averagejoeslab/nanoagent/issues/13) - Memory leak: tokenizer not freed on exit
-- [#14](https://github.com/averagejoeslab/nanoagent/issues/14) - Readline interface not closed on error
-- [#15](https://github.com/averagejoeslab/nanoagent/issues/15) - Optimize token counting performance
-- [#16](https://github.com/averagejoeslab/nanoagent/issues/16) - Add JSDoc comments for public functions
-- [#17](https://github.com/averagejoeslab/nanoagent/issues/17) - Extract magic numbers to named constants
-- [#18](https://github.com/averagejoeslab/nanoagent/issues/18) - Add unit tests for core functionality
-- [#19](https://github.com/averagejoeslab/nanoagent/issues/19) - Add sensitive data protection in trace files
-- [#20](https://github.com/averagejoeslab/nanoagent/issues/20) - README: Update shell timeout documentation
-- [#23](https://github.com/averagejoeslab/nanoagent/issues/23) - Security: ReDoS vulnerability in regex handling
-- [#27](https://github.com/averagejoeslab/nanoagent/issues/27) - UX: Add rate limiting/summary for rapid tool execution display
-- [#28](https://github.com/averagejoeslab/nanoagent/issues/28) - Verify: Line numbering calculation with offset parameter
-- [#30](https://github.com/averagejoeslab/nanoagent/issues/30) - Add configuration file support (.nanoagent.config.json)
-- [#32](https://github.com/averagejoeslab/nanoagent/issues/32) - Missing directory creation in write tool
-- [#34](https://github.com/averagejoeslab/nanoagent/issues/34) - Add debug/logging mode for troubleshooting
-- [#36](https://github.com/averagejoeslab/nanoagent/issues/36) - Add file size limits to prevent memory exhaustion
-- [#37](https://github.com/averagejoeslab/nanoagent/issues/37) - Improve grep performance with scanning limits
-- [#38](https://github.com/averagejoeslab/nanoagent/issues/38) - Add consistent result limits across tools
-- [#39](https://github.com/averagejoeslab/nanoagent/issues/39) - Add stdin TTY validation for interactive mode
-- [#40](https://github.com/averagejoeslab/nanoagent/issues/40) - Fix empty file handling edge case
-- [#41](https://github.com/averagejoeslab/nanoagent/issues/41) - No file size limits in grep tool
-- [#52](https://github.com/averagejoeslab/nanoagent/issues/52) - Duplicate Code Pattern in Tool Implementations
-- [#53](https://github.com/averagejoeslab/nanoagent/issues/53) - Platform Compatibility - process.getuid/getgid Not Available on Windows
-- [#54](https://github.com/averagejoeslab/nanoagent/issues/54) - Improve Variable Naming for Clarity
-- [#57](https://github.com/averagejoeslab/nanoagent/issues/57) - Missing retry logic for API calls
-- [#60](https://github.com/averagejoeslab/nanoagent/issues/60) - System prompt inconsistency between one-off and REPL modes
-- [#63](https://github.com/averagejoeslab/nanoagent/issues/63) - Add graceful degradation when sandbox fails to start
-- [#64](https://github.com/averagejoeslab/nanoagent/issues/64) - Add concurrency limits for parallel tool execution
-- [#68](https://github.com/averagejoeslab/nanoagent/issues/68) - Inconsistent async/await usage in tool implementations
-- [#69](https://github.com/averagejoeslab/nanoagent/issues/69) - Use streaming for large file operations
-- [#70](https://github.com/averagejoeslab/nanoagent/issues/70) - Container name could use more entropy for uniqueness
-- [#71](https://github.com/averagejoeslab/nanoagent/issues/71) - Refactor global mutable state into class or module
-- [#72](https://github.com/averagejoeslab/nanoagent/issues/72) - Split main() into separate functions for one-off vs REPL modes
-- [#77](https://github.com/averagejoeslab/nanoagent/issues/77) - Performance - Sequential file reading in grep slows large codebases
-- [#78](https://github.com/averagejoeslab/nanoagent/issues/78) - Performance - Inefficient token budget loading for large traces
-- [#81](https://github.com/averagejoeslab/nanoagent/issues/81) - Missing error context and stack traces in fatal error handler
-- [#87](https://github.com/averagejoeslab/nanoagent/issues/87) - Documentation References Non-Existent Files
-- [#99](https://github.com/averagejoeslab/nanoagent/issues/99) - Documentation missing for semantic memory recall feature
-- [#100](https://github.com/averagejoeslab/nanoagent/issues/100) - Embeddings model download on first run not documented
+- #103 - [Nanoagent Review] LOW: containerId could use better validation in Docker commands
+- #81 - [Nanoagent Review] LOW: Missing error context and stack traces in fatal error handler
+- #78 - [Nanoagent Review] LOW: Performance - Inefficient token budget loading for large traces
+- #77 - [Nanoagent Review] LOW: Performance - Sequential file reading in grep slows large codebases
+- #72 - [Nanoagent Review] LOW: Split main() into separate functions for one-off vs REPL modes
+- #71 - [Nanoagent Review] LOW: Refactor global mutable state into class or module
+- #70 - [Nanoagent Review] LOW: Container name could use more entropy for uniqueness
+- #69 - [Nanoagent Review] LOW: Use streaming for large file operations
+- #68 - [Nanoagent Review] LOW: Inconsistent async/await usage in tool implementations
+- #64 - [Nanoagent Review] Add concurrency limits for parallel tool execution
+- #63 - [Nanoagent Review] Add graceful degradation when sandbox fails to start
+- #60 - [Nanoagent Review] System prompt inconsistency between one-off and REPL modes
+- #57 - [Nanoagent Review] Missing retry logic for API calls
+- #54 - [Nanoagent Review] LOW: Improve Variable Naming for Clarity
+- #53 - [Nanoagent Review] LOW: Platform Compatibility - process.getuid/getgid Not Available on Windows
+- #52 - [Nanoagent Review] LOW: Duplicate Code Pattern in Tool Implementations
+- #41 - [Nanoagent Review] No file size limits in grep tool
+- #40 - [Nanoagent Review] Fix empty file handling edge case
+- #39 - [Nanoagent Review] Add stdin TTY validation for interactive mode
+- #38 - [Nanoagent Review] Add consistent result limits across tools
+- #37 - [Nanoagent Review] Improve grep performance with scanning limits
+- #36 - [Nanoagent Review] Add file size limits to prevent memory exhaustion
+- #34 - [Nanoagent Review] Add debug/logging mode for troubleshooting
+- #32 - [Nanoagent Review] Missing directory creation in write tool
+- #30 - [Nanoagent Review] Add configuration file support (.nanoagent.config.json)
+- #28 - [Nanoagent Review] Verify: Line numbering calculation with offset parameter
+- #27 - [Nanoagent Review] UX: Add rate limiting/summary for rapid tool execution display
+- #25 - [Nanoagent Review] Memory: Unbounded message array growth in REPL mode
+- #23 - [Nanoagent Review] Security: ReDoS vulnerability in regex handling
+- #20 - [Nanoagent Review] README: Update shell timeout documentation
+- #19 - [Nanoagent Review] Add sensitive data protection in trace files
+- #18 - [Nanoagent Review] Add unit tests for core functionality
+- #17 - [Nanoagent Review] Extract magic numbers to named constants
+- #16 - [Nanoagent Review] Add JSDoc comments for public functions
+- #15 - [Nanoagent Review] Optimize token counting performance
+- #14 - [Nanoagent Review] Readline interface not closed on error
+- #13 - [Nanoagent Review] Memory leak: tokenizer not freed on exit
+- #12 - [Nanoagent Review] File system errors lack helpful context
+- #11 - [Nanoagent Review] Race condition in concurrent file writes to trace
+- #10 - [Nanoagent Review] Missing input validation for tool parameters
+- #5 - [Nanoagent Review] Weak type safety with excessive use of 'any'
 
 ---
 
-**Total Open Issues: 70**
+## Summary Statistics
 
-Last updated: 2024-12-19 (automated via issue reconciliation workflow)
+- **Total Open Issues:** 65
+- **Critical Priority:** 5
+- **High Priority:** 5
+- **Medium Priority:** 13
+- **Low Priority:** 42
+
+## Recently Closed Issues
+
+- #48 - DISABLE_SANDBOX naming inconsistency (FIXED - verified in README.md:163)
+- #45 - Event listeners added repeatedly (FIXED - verified in nanoagent.ts:196-210)
+- #99 - Semantic memory not documented (Consolidated into #105)
+- #100 - Embeddings download not documented (Consolidated into #105)
+- #87 - Documentation references non-existent files (Consolidated into #105)
+
+## Verification Notes
+
+All critical and high priority issues have been verified by reading actual code:
+- Command injection vulnerabilities confirmed at specific line numbers
+- API timeout missing confirmed in callLLM function
+- EOF injection vulnerability confirmed in write tool implementation
+- All findings documented with file locations and evidence
+
+See individual issue comments for detailed verification evidence.
