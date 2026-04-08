@@ -444,11 +444,14 @@ function countTokens(text: string): number {
   return tokenizer.encode(text).length;
 }
 
-async function embed(text: string): Promise<number[]> {
+async function initializeEmbedder(): Promise<void> {
   if (!embedder) {
-    console.log(`${ANSI.dim}Loading embedding model (first time only)...${ANSI.reset}`);
+    console.log(`${ANSI.dim}Loading embedding model...${ANSI.reset}`);
     embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
   }
+}
+
+async function embed(text: string): Promise<number[]> {
   const output = await embedder(text, { pooling: 'mean', normalize: true });
   return Array.from(output.data);
 }
@@ -687,6 +690,9 @@ async function main() {
     console.error(`${ANSI.dim}Set it in .env file or environment${ANSI.reset}`);
     process.exit(1);
   }
+  
+  // Pre-load embedding model
+  await initializeEmbedder();
   
   const oneOffPrompt = process.argv[2];
   
