@@ -691,16 +691,16 @@ async function main() {
     process.exit(1);
   }
   
+  const oneOffPrompt = process.argv[2];
+  
   // One-off mode: run single prompt and exit
   if (oneOffPrompt) {
     // Pre-load embedding model for one-off mode
     await initializeEmbedder();
     const { messages, recalledMemories } = await loadTrace(oneOffPrompt);
-    // Pre-load embedding model for one-off mode
-    await initializeEmbedder();
-    const systemPrompt = `Concise coding assistant. cwd: ${process.cwd()}${USE_SANDBOX ? "\n\nSECURITY: All tools run in sandboxed Docker container (no network, isolated filesystem, 512MB RAM, 1 CPU)." : ""}
+    const systemPrompt = \`Concise coding assistant. cwd: \${process.cwd()}\${USE_SANDBOX ? "\\n\\nSECURITY: All tools run in sandboxed Docker container (no network, isolated filesystem, 512MB RAM, 1 CPU)." : ""}
 
-${recalledMemories}`;
+\${recalledMemories}\`;
     
     messages.push({ role: "user", content: oneOffPrompt });
     await agenticLoop(messages, systemPrompt);
@@ -714,17 +714,11 @@ ${recalledMemories}`;
     return;
   }
   
-  // Pre-load embedding model before showing banner
-  await initializeEmbedder();
-  
   // Interactive REPL mode
   // Pre-load embedding model before showing banner
   await initializeEmbedder();
   
-  console.log(`
-${ANSI.bold}${ANSI.cyan}nanoagent${USE_SANDBOX ? " 🐳" : ""}${ANSI.reset}
-${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}${USE_SANDBOX ? ` | ${ANSI.green}sandboxed${ANSI.reset}` : ""}
-`);
+  console.log(\`
 
   // Load initial state to show stats
   const initialLoad = await loadTrace();
