@@ -81,7 +81,7 @@ class Sandbox {
     }
 
     const dockerArgs = [
-      "run", "-d", "--rm", "--name", name,
+      "docker", "run", "-d", "--rm", "--name", name,
       // Security
       "--cap-drop", "ALL",
       "--security-opt", "no-new-privileges",
