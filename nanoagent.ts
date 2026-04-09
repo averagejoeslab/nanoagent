@@ -62,7 +62,7 @@ type TraceTurn = {
   embedding: number[];
 };
 
-// ─── TOKENIZER ──────────────────────────────────────────────────────────────
+// ─── UTILITIES ──────────────────────────────────────────────────────────────
 const tokenizer = new Tiktoken(cl100k_base);
 
 function countTokens(text: string): number {
@@ -75,6 +75,10 @@ function messageTokens(msg: Message): number {
 
 function totalMessageTokens(messages: Message[]): number {
   return messages.reduce((sum, msg) => sum + messageTokens(msg), 0);
+}
+
+function getCurrentTimestamp(): string {
+  return new Date().toISOString();
 }
 
 // ─── SANDBOX ─────────────────────────────────────────────────────────────────
@@ -338,7 +342,7 @@ function turnTextForEmbedding(messages: Message[]): string {
 async function saveEpisode(messages: Message[]): Promise<void> {
   await mkdir(".nanoagent", { recursive: true });
   const embedding = await embed(turnTextForEmbedding(messages));
-  const turn: TraceTurn = { timestamp: new Date().toISOString(), messages, embedding };
+  const turn: TraceTurn = { timestamp: getCurrentTimestamp(), messages, embedding };
   await appendFile(TRACE_FILE, JSON.stringify(turn) + "\n");
 }
 
@@ -366,7 +370,7 @@ async function callLLM(messages: Message[], systemPrompt: string, useTools = tru
 }
 
 // ─── RECALL ──────────────────────────────────────────────────────────────────
-async function recallMemories(query: string, allTurns: TraceTurn[]): Promise<string> {
+async function recallMemories(query: string, allTurns: TraceTurn[], recentTurns: TraceTurn[] = []): Promise<string> {
   if (!allTurns.length || !allTurns.some((t) => t.embedding)) return "";
 
   const queryVec = await embed(query);
@@ -398,10 +402,37 @@ async function recallMemories(query: string, allTurns: TraceTurn[]): Promise<str
     })
     .join("\n\n---\n\n");
 
+  const recentContext = recentTurns.length > 0
+    ? recentTurns.map((turn) => {
+        const date = new Date(turn.timestamp).toLocaleString();
+        const summary = turn.messages.map((msg) => {
+          const role = msg.role === "user" ? "User" : "Assistant";
+          if (typeof msg.content === "string") return `${role}: ${msg.content}`;
+          return `${role}: ${(msg.content as any[]).map((b) => {
+            if (b.type === "text") return b.text;
+            if (b.type === "tool_use") return `[Used tool: ${b.name}]`;
+            if (b.type === "tool_result") return `[Tool result: ${typeof b.content === "string" ? b.content.slice(0, 200) : "..."}]`;
+            return "";
+          }).filter(Boolean).join("\n")}`;
+        }).join("\n");
+        return `${date}\n${summary}`;
+      }).join("\n\n---\n\n")
+    : "";
+
+  const contextSection = recentContext
+    ? `Recent conversation context (last 3 turns):
+
+${recentContext}
+
+---
+
+`
+    : "";
+
   const response = await callLLM(
     [{ role: "user", content: `You are extracting relevant memories for a coding assistant.
 
-Current user query: "${query}"
+${contextSection}Current user query: "${query}"
 
 Here are candidate memories from past conversations:
 
@@ -435,19 +466,22 @@ async function assembleWorkingMemory(input: string, baseSystemPrompt: string): P
 }> {
   const allTurns = await loadEpisodicTrace();
 
-  // Step 1: Recall from all turns (independent of budget)
-  const recalledMemories = await recallMemories(input, allTurns);
+  // Step 1: Get recent turns for context (last 3)
+  const recentTurns = allTurns.slice(-3);
 
-  // Step 2: Assemble full system prompt
+  // Step 2: Recall from all turns with recent context
+  const recalledMemories = await recallMemories(input, allTurns, recentTurns);
+
+  // Step 3: Assemble full system prompt
   const systemPrompt = recalledMemories
     ? `${baseSystemPrompt}\n\n${recalledMemories}`
     : baseSystemPrompt;
 
-  // Step 3: Compute exact working memory budget
+  // Step 4: Compute exact working memory budget
   const systemTokens = countTokens(systemPrompt);
   const workingBudget = CONTEXT_WINDOW - MAX_TOKENS - TOOL_SCHEMA_TOKENS - systemTokens;
 
-  // Step 4: Fill turns buffer (newest first, reserving space for user input)
+  // Step 5: Fill turns buffer (newest first, reserving space for user input)
   const inputTokens = countTokens(input);
   const bufferBudget = workingBudget - inputTokens;
 
@@ -462,7 +496,7 @@ async function assembleWorkingMemory(input: string, baseSystemPrompt: string): P
     bufferTokens += tokens;
   }
 
-  // Step 5: Flatten turns buffer into messages, track turn sizes for eviction
+  // Step 6: Flatten turns buffer into messages, track turn sizes for eviction
   const messages: Message[] = [];
   const bufferTurnSizes: number[] = [];
   for (const turn of bufferTurns) {
@@ -570,7 +604,9 @@ async function main() {
 
   await initializeEmbedder();
 
-  const baseSystemPrompt = `Concise coding assistant. cwd: ${process.cwd()}${
+  const baseSystemPrompt = `Concise coding assistant. cwd: ${process.cwd()}
+
+Current time: ${getCurrentTimestamp()}${
     USE_SANDBOX
       ? "\n\nSECURITY: The bash tool runs in a sandboxed Docker container (no network, isolated filesystem, 512MB RAM, 1 CPU). File tools (read, write, edit, glob, grep) run on the host."
       : ""
