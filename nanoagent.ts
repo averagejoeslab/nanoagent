@@ -8,6 +8,7 @@
 import { readFile, writeFile, mkdir, appendFile } from "node:fs/promises";
 import { execSync, spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { homedir } from "node:os";
 import * as readline from "node:readline";
 import { Tiktoken } from "js-tiktoken/lite";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
@@ -18,7 +19,7 @@ const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 8192;
 const SHELL_TIMEOUT = 30000;
-const TRACE_FILE = ".nanoagent/trace.jsonl";
+const TRACE_FILE = `${homedir()}/.nanoagent/trace.jsonl`;
 const CONTEXT_WINDOW = 200000;
 const RECALL_THRESHOLD = 0.3;
 
