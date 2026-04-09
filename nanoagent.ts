@@ -341,7 +341,7 @@ function turnTextForEmbedding(messages: Message[]): string {
 }
 
 async function saveEpisode(messages: Message[]): Promise<void> {
-  await mkdir(".nanoagent", { recursive: true });
+  await mkdir(`${homedir()}/.nanoagent`, { recursive: true });
   const embedding = await embed(turnTextForEmbedding(messages));
   const turn: TraceTurn = { timestamp: getCurrentTimestamp(), messages, embedding };
   await appendFile(TRACE_FILE, JSON.stringify(turn) + "\n");
