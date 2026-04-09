@@ -104,6 +104,7 @@ class Sandbox {
       "docker", "run", "-d", "--rm", "--name", name,
       "--cap-drop", "ALL",
       "--security-opt", "no-new-privileges",
+      "--network", "none",
       "--read-only",
       "--tmpfs", "/tmp:rw,noexec,nosuid,size=100m",
       "-v", `${cwd}:/workspace`,
