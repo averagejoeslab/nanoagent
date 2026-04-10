@@ -128,22 +128,25 @@ nanoagent/
 
 ## Lessons
 
-The `lessons/` directory teaches you to build nanoagent from scratch in 12 lessons:
+The `lessons/` directory teaches you to build nanoagent from scratch in 12 lessons. Each adds one concept. Each ends with a working agent.
 
-1. What Is an Agent
-2. Call Claude
-3. Give It a Tool and Let It Act
-4. Close the Loop
-5. Expand the Toolkit
-6. Use It
-7. Give It Memory
-8. The Context Window
-9. Make Memories Searchable
-10. Recall What Matters
-11. Working Memory
-12. Sandbox Command Execution
+**Build it:**
+1. **[What Is an Agent](lessons/01-what-is-an-agent.md)** — Agents vs chatbots, the ReAct pattern, tools as the differentiator
+2. **[Call Claude](lessons/02-call-claude.md)** — HTTP POST to the Anthropic API, messages, responses
+3. **[Give It a Tool and Let It Act](lessons/03-give-it-a-tool-and-let-it-act.md)** — Tool schemas, execution, tool_result, the passthrough pattern
+4. **[Close the Loop](lessons/04-close-the-loop.md)** — The agentic loop: while(true), break on no tools, parallel execution
+5. **[Expand the Toolkit](lessons/05-expand-the-toolkit.md)** — Six tools, tool registry, auto-generated schemas
+6. **[Use It](lessons/06-use-it.md)** — Interactive REPL, one-off CLI mode, ANSI output
 
-Each lesson adds one concept. Each lesson ends with a working agent.
+**Make it remember:**
+7. **[Give It Memory](lessons/07-give-it-memory.md)** — Episodic trace, saving whole turns, JSONL persistence
+8. **[The Context Window](lessons/08-the-context-window.md)** — Tokens, Tiktoken, budget math, loading what fits
+9. **[Make Memories Searchable](lessons/09-make-memories-searchable.md)** — Local embeddings, cosine similarity, vector search
+10. **[Recall What Matters](lessons/10-recall-what-matters.md)** — Two-stage retrieval, similarity threshold, LLM reranking
+11. **[Working Memory](lessons/11-working-memory.md)** — Assembly order, turns buffer, mid-turn eviction
+
+**Make it safe:**
+12. **[Sandbox Command Execution](lessons/12-sandbox-command-execution.md)** — Docker for bash, security flags, why only bash needs it
 
 ## License
 
