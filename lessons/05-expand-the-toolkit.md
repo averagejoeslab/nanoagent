@@ -1,21 +1,32 @@
-# Lesson 6: Expand the Toolkit
+# Lesson 5: Expand the Toolkit
 
-## The Problem
+One tool isn't enough. A coding agent needs to read, write, search, and execute. Let's add five more tools and organize them properly.
 
-Our agent can read files. That's it. A useful coding agent needs to:
-- **Read** the world: read files, find files, search contents
-- **Change** the world: write files, edit files
-- **Execute** in the world: run shell commands
+## The Tool Registry
+
+Instead of hand-writing schemas for each tool, define tools in a registry and generate schemas automatically:
+
+```typescript
+type Tool = {
+  desc: string;
+  params: string[];
+  fn: (args: any) => Promise<string> | string;
+};
+
+const TOOLS: Record<string, Tool> = {
+  // tools go here
+};
+```
+
+Each tool has a description, parameter names (suffix `?` for optional), and a function that returns a string. The registry makes adding tools easy and keeps schemas in sync.
 
 ## Six Tools
-
-Here are the six tools we need, implemented as a tool registry:
 
 ```typescript
 import { readFile, writeFile } from "node:fs/promises";
 import { execSync } from "node:child_process";
 
-const TOOLS: Record<string, { desc: string; params: string[]; fn: (args: any) => Promise<string> | string }> = {
+const TOOLS: Record<string, Tool> = {
   read: {
     desc: "Read file with line numbers. Use offset/limit to paginate large files (0-indexed line numbers)",
     params: ["path", "offset?", "limit?"],
@@ -96,22 +107,44 @@ const TOOLS: Record<string, { desc: string; params: string[]; fn: (args: any) =>
 };
 ```
 
-## What Each Tool Does
+Every tool returns a string. `edit` has built-in safety — it won't silently replace the wrong occurrence when multiple matches exist. `bash` returns stdout on success, stderr on failure. The LLM reads whatever comes back and decides what to do next.
 
-| Tool | Category | Returns on success | Returns on error |
-|------|----------|-------------------|-----------------|
-| `read` | Read | File content with line numbers | Throws (executor catches) |
-| `write` | Change | `"ok"` | Throws |
-| `edit` | Change | `"ok"` | `"error: old_string not found"` or `"error: old_string appears N times..."` |
-| `glob` | Read | File paths, one per line, or `"none"` | Throws |
-| `grep` | Read | `file:line:content` matches, or `"none"` | Throws |
-| `bash` | Execute | stdout, or `"(empty)"` | stderr or error message |
+## Auto-Generated Schemas
 
-Every tool returns a string. The `edit` tool has built-in safety — it won't silently replace the wrong occurrence when multiple matches exist.
+Generate the API tool schemas from the registry:
 
-## Updating the Executor
+```typescript
+function buildToolSchema() {
+  return Object.entries(TOOLS).map(([name, { desc, params }]) => {
+    const required = params.filter((p) => !p.endsWith("?")).map((p) => p.replace("?", ""));
+    const allParams = params.map((p) => p.replace("?", ""));
+    const properties = Object.fromEntries(allParams.map((p) => {
+      if (p === "all") return [p, { type: "boolean" }];
+      if (p === "offset" || p === "limit") return [p, { type: "integer" }];
+      return [p, { type: "string" }];
+    }));
+    return { name, description: desc, input_schema: { type: "object", properties, required } };
+  });
+}
 
-The executor now looks up tools by name from the registry:
+const TOOL_SCHEMAS = buildToolSchema();
+```
+
+Add a tool to the registry → schema is generated automatically. Update `callLLM` to use `TOOL_SCHEMAS`:
+
+```typescript
+body: JSON.stringify({
+  model: MODEL,
+  max_tokens: MAX_TOKENS,
+  system: systemPrompt,
+  messages,
+  tools: TOOL_SCHEMAS,
+}),
+```
+
+## Generic Executor
+
+The executor looks up any tool by name:
 
 ```typescript
 async function executeTool(name: string, input: any): Promise<string> {
@@ -125,29 +158,8 @@ async function executeTool(name: string, input: any): Promise<string> {
 }
 ```
 
-One function handles all tools. Add a new tool to `TOOLS` and it works automatically.
+One function handles all tools. The passthrough pattern from Lesson 3 — tools return strings, executor passes them through, LLM self-corrects on errors.
 
-## The Three Categories
+## What We Have
 
-Every tool in any agent falls into one of three categories:
-
-| Category | Coding tools | What they do |
-|----------|-------------|-------------|
-| **Read** | `read`, `glob`, `grep` | Observe the world without changing it |
-| **Change** | `write`, `edit` | Modify the world |
-| **Execute** | `bash` | Run arbitrary operations |
-
-The execute category (`bash`) is the most powerful and dangerous — it can do anything the shell can do. We'll secure it with sandboxing in a later lesson.
-
-## Next Steps
-
-We have tools and a loop. The code works but it's getting messy. Let's organize it properly.
-
----
-
-**Key Takeaways:**
-- Six tools cover reading, writing, searching, and executing
-- All tools return strings. The executor passes them through.
-- The tool registry pattern: define tools in a record, look up by name
-- `edit` has safety guards against ambiguous replacements
-- `bash` is the most powerful tool — and the most dangerous
+Six tools, auto-generated schemas, a generic executor. The agent can read files, write files, edit code, search a codebase, and run commands. But we're still running it from a script. Let's make it interactive.

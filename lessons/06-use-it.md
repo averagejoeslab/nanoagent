@@ -1,17 +1,16 @@
-# Lesson 8: Make It Interactive
+# Lesson 6: Use It
 
-## The Problem
-
-Right now you have to edit the source code to change the prompt. We need two modes:
-- **REPL** — interactive conversation in the terminal
-- **One-off** — run a single prompt from the command line (for scripting)
+We have a working agent with six tools. Let's make it something you can actually use — an interactive REPL and a one-off CLI mode.
 
 ## The REPL
 
-Use Node's `readline` for interactive input:
-
 ```typescript
 import * as readline from "node:readline";
+
+const ANSI = {
+  reset: "\x1b[0m", bold: "\x1b[1m", dim: "\x1b[2m",
+  blue: "\x1b[34m", cyan: "\x1b[36m", green: "\x1b[32m", red: "\x1b[31m",
+};
 
 async function main() {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -35,10 +34,6 @@ async function main() {
 
     if (!input) continue;
     if (input === "/q" || input === "exit") break;
-    if (input === "/c") {
-      console.log(`${ANSI.green}⏺ Cleared conversation${ANSI.reset}`);
-      continue;
-    }
 
     const messages: Message[] = [{ role: "user", content: input }];
     await agenticLoop(messages, systemPrompt);
@@ -56,7 +51,7 @@ main().catch((e) => {
 
 ## One-Off Mode
 
-Check `process.argv[2]` for a prompt passed as a command line argument:
+Check for a command-line argument. If present, run it and exit:
 
 ```typescript
 const oneOffPrompt = process.argv[2];
@@ -70,27 +65,38 @@ if (oneOffPrompt) {
 // Otherwise, start the REPL...
 ```
 
-Now the agent works both ways:
+Two ways to use the same agent:
 ```bash
 # Interactive
 bun run nanoagent.ts
 
-# One-off
+# Scripted
 bun run nanoagent.ts "Read package.json and tell me the version"
 ```
 
-## Commands
+## Make the Loop Readable
 
-The REPL handles a few built-in commands:
-- `/q` or `exit` — quit
-- `/c` — clear conversation (we'll use this more when we add memory)
-- Empty input — skip
+Add colors to the agentic loop so you can see what's happening:
 
-## Both Modes, Same Agent
+```typescript
+// Text output
+console.log(`\n${ANSI.cyan}⏺${ANSI.reset} ${block.text}`);
 
-Both modes call the same `agenticLoop` with the same tools. The only difference is where the input comes from. This is important — the agent's behavior is identical whether it's interactive or scripted.
+// Tool calls
+const preview = String(Object.values(call.input)[0] ?? "").slice(0, 50);
+console.log(`\n${ANSI.green}⏺ ${call.name}${ANSI.reset}(${ANSI.dim}${preview}${ANSI.reset})`);
 
-## What It Looks Like
+// Tool results
+const lines = result.split("\n");
+const preview = lines[0].slice(0, 60) + (lines.length > 1 ? ` +${lines.length - 1} lines` : "");
+console.log(`  ${ANSI.dim}⎿  ${preview}${ANSI.reset}`);
+```
+
+## Try It
+
+```bash
+bun run nanoagent.ts
+```
 
 ```
 nanoagent
@@ -106,14 +112,16 @@ claude-sonnet-4-5 | /path/to/project
 ⏺ There are 3 files: nanoagent.ts, package.json, and bun.lockb.
 ```
 
-## Next Steps
+Play with it. Ask it to read files, create files, search for patterns, run commands. It works.
 
-When Claude requests multiple tools at once, we execute them one at a time. We can do better.
+## What We Have
 
----
+A working coding agent with:
+- 6 tools (read, write, edit, glob, grep, bash)
+- An agentic loop that chains operations
+- Parallel tool execution
+- Interactive REPL + one-off CLI
 
-**Key Takeaways:**
-- `readline` provides the interactive REPL loop
-- `process.argv[2]` enables one-off mode for scripting
-- Both modes use the same `agenticLoop` — identical behavior
-- Validate the API key early. Fail fast if it's missing.
+This is a real, usable agent. But try this: quit with `/q`, restart, and ask "What were we just working on?"
+
+It has no idea. Every restart is a blank slate. Let's fix that.
