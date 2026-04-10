@@ -1,263 +1,98 @@
-# Nanoagent Sandbox Implementation
+# Sandbox
 
-## Overview
+nanoagent sandboxes the `bash` tool inside a Docker container. File tools (`read`, `write`, `edit`, `glob`, `grep`) use direct Node/Bun APIs and are not sandboxed — they can only do what their interface allows.
 
-Nanoagent now supports **production-grade sandboxing** using Docker containers. This provides industry-standard security isolation for AI agent execution.
+`bash` runs arbitrary shell commands. It's the only tool that can access the network, spawn processes, or do anything the shell can do. That's why it's the only tool that needs containment.
 
 ## What's Sandboxed
 
-All dangerous operations run in isolated Docker containers:
+| Tool | Runs in | Why |
+|------|---------|-----|
+| `read`, `write`, `edit`, `glob`, `grep` | Host (direct APIs) | Structurally constrained — can only read/write/search files |
+| `bash` | Docker container | Structurally unconstrained — can do anything |
 
-- ✅ **bash commands** - Execute in container with no host access
-- ✅ **file operations** - read/write/edit in sandbox workspace
-- ✅ **grep/glob** - Search operations isolated
-- ✅ **Resource limits** - Memory, CPU, process limits enforced
-- ✅ **Network isolation** - No network access (--network none)
-- ✅ **Filesystem isolation** - Can't access ~/.ssh, ~/.aws, system files
-
-## Security Model
-
-### 5 Layers of Protection
-
-**1. Filesystem Isolation**
-- Root filesystem: read-only
-- Writable space: 500MB tmpfs (in-memory, ephemeral)
-- Host files: mounted read-only at /mnt/host
-- No access to: ~/.ssh, ~/.aws, .env, system directories
-
-**2. Network Isolation**
-- `--network none` - Zero network interfaces
-- Can't exfiltrate data
-- Can't download malware
-- Can't make unauthorized API calls
-
-**3. Resource Limits**
-- Memory: 512MB (no swap)
-- CPU: 1.0 cores
-- PIDs: 100 processes max
-- Timeout: 30 seconds per command
-
-**4. Capability Dropping**
-- `--cap-drop ALL` - No Linux capabilities
-- `--user 1000:1000` - Non-root user
-- `--security-opt no-new-privileges` - No privilege escalation
-
-**5. Seccomp Profile**
-- Default Docker seccomp applied
-- Blocks ~44 dangerous syscalls
-- Prevents kernel exploits
-
-## Architecture
+## Security Flags
 
 ```
-User
-  ↓
-Nanoagent (host)
-  ↓
-Sandbox Runtime (manages Docker lifecycle)
-  ↓
-Docker Container (isolated execution)
-  ↓
-Tool Execution (bash/read/write/etc)
+--cap-drop ALL                    No Linux capabilities
+--security-opt no-new-privileges  No privilege escalation
+--network none                    No network access
+--read-only                       Read-only container filesystem
+--tmpfs /tmp:rw,noexec,nosuid,size=100m   Writable temp (100MB, non-executable)
+-v ${cwd}:/workspace              Project directory mounted read-write
+--user ${uid}:${gid}              Runs as host user (not root)
+--memory 512m                     Memory limit
+--memory-swap 512m                No swap
+--cpus 1.0                        CPU limit
+--pids-limit 100                  Process limit
 ```
 
-### Persistent Session
+## What This Prevents
 
-The sandbox container persists across multiple tool calls:
-- Faster execution (no container startup overhead)
-- State preserved between operations
-- Files written in sandbox stay available
-- Automatically cleaned up on exit
+- **Network exfiltration** — `curl`, `wget`, DNS lookups all fail
+- **Credential theft** — no access to `~/.ssh`, `~/.aws`, or anything outside the project
+- **Resource exhaustion** — can't consume all host memory, CPU, or PIDs
+- **Privilege escalation** — no capabilities, no setuid, non-root user
+- **Fork bombs** — PID limit of 100
+- **Filesystem damage** — container root is read-only, only `/tmp` and `/workspace` are writable
 
-## Usage
+## What This Does NOT Prevent
 
-### Basic Usage (Sandbox Enabled by Default)
+- **Modifying project files** — the workspace is mounted read-write (the agent needs to edit code)
+- **Reading project files** — the agent needs to read code to work on it
+- **Prompt injection** — the LLM can still be manipulated through crafted file contents
+- **Data in context** — sensitive data in the conversation is visible to the LLM
 
-```bash
-# One-off mode
-bun nanoagent-sandboxed.ts "list all TypeScript files"
+## Container Lifecycle
 
-# Interactive mode
-bun nanoagent-sandboxed.ts
-> create a hello world script and run it
+**Lazy initialization.** No container is created until the first `bash` call. If the LLM only uses file tools, no container is ever started.
+
+**Singleton.** One container per session, reused across all `bash` calls. Files created by one command are visible to the next.
+
+**Auto-build.** The sandbox image is built automatically from `Dockerfile.sandbox` on first use if it doesn't exist.
+
+**Retry on failure.** If the container dies, the `bash` tool creates a new one and retries the command.
+
+**Synchronous cleanup.** On process exit (including SIGINT/SIGTERM), `docker stop` runs synchronously to ensure the container is removed.
+
+## Container Image
+
+`Dockerfile.sandbox`:
+
+```dockerfile
+FROM node:20-slim
+
+RUN apt-get update && apt-get install -y \
+    bash curl git python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+CMD ["sleep", "infinity"]
 ```
 
-### Disable Sandbox (Not Recommended)
+The container runs `sleep infinity` to stay alive for the session. Commands are executed via `docker exec`.
 
-```bash
-SANDBOX=false bun nanoagent-sandboxed.ts "your prompt"
-```
+## Building
 
-## Files
-
-### Core Implementation
-
-**`Dockerfile.sandbox`**
-- Defines the sandbox container image
-- Based on node:20-slim
-- Includes bash, curl, git, python3
-- Runs as non-root user (UID 1000)
-
-**`sandbox-runtime.ts`**
-- Manages sandbox lifecycle (create/start/stop)
-- Executes commands in container
-- Handles file operations
-- Provides health checks
-- Automatic cleanup on exit
-
-**`nanoagent-sandboxed.ts`**
-- Modified nanoagent with sandbox integration
-- Tools route through sandbox when enabled
-- Fallback to host execution if sandbox disabled
-- Shows sandbox status in prompt (🐳)
-
-## API Reference
-
-### Sandbox Class
-
-```typescript
-import { Sandbox } from "./sandbox-runtime";
-
-const sandbox = new Sandbox({
-  memory: "512m",    // Memory limit
-  cpus: "1.0",       // CPU limit
-  pidsLimit: 100,    // Process limit
-  timeout: 30000,    // Command timeout (ms)
-  network: false,    // Enable network
-});
-
-await sandbox.start();
-
-// Execute command
-const result = await sandbox.exec("echo hello");
-// result: { stdout, stderr, exitCode, timedOut }
-
-// File operations
-await sandbox.writeFile("/workspace/test.txt", "content");
-const content = await sandbox.readFile("/workspace/test.txt");
-
-// Cleanup
-await sandbox.stop();
-```
-
-### Global Singleton
-
-```typescript
-import { getSandbox } from "./sandbox-runtime";
-
-// Get or create global sandbox instance
-const sandbox = await getSandbox();
-// Automatically starts on first call
-// Reused across all operations
-// Cleaned up on process exit
-```
-
-## Building the Sandbox Image
-
-The sandbox image is built automatically on first use, but you can pre-build it:
+The image builds automatically on first `bash` call. To pre-build:
 
 ```bash
 docker build -f Dockerfile.sandbox -t nanoagent-sandbox .
 ```
 
-## Security Best Practices
+## Disabling
 
-### What the Sandbox Protects Against
-
-✅ **Malicious bash commands** - Can't access system files, credentials
-✅ **Prompt injection attacks** - Limited damage scope
-✅ **Resource exhaustion** - Memory/CPU limits enforced
-✅ **Network exfiltration** - No network access
-✅ **File system tampering** - Read-only host filesystem
-✅ **ReDoS attacks** - Grep timeouts, process limits
-
-### What the Sandbox Does NOT Protect Against
-
-❌ **Context injection** - AI can still be manipulated via prompts
-❌ **Data in prompts** - Sensitive data in user input still visible
-❌ **API key leakage** - AI responses could echo API keys if in context
-
-### Recommendations
-
-1. **Never put secrets in prompts** - Use environment variables
-2. **Review AI-generated commands** - Before approving in production
-3. **Monitor sandbox usage** - Log all tool executions
-4. **Keep sandbox updated** - Rebuild image regularly
-5. **Consider network proxy** - For controlled external access
-
-## Troubleshooting
-
-### Sandbox Won't Start
+For trusted environments:
 
 ```bash
-# Check Docker is running
-docker ps
-
-# Check for port conflicts
-docker ps -a | grep nanoagent
-
-# Clean up old containers
-docker rm -f $(docker ps -a -q --filter "name=nanoagent-sandbox")
-
-# Rebuild image
-docker build -f Dockerfile.sandbox -t nanoagent-sandbox .
+DISABLE_SANDBOX=true bun nanoagent.ts
 ```
 
-### Slow Performance
+When disabled, `bash` runs directly on the host via `execSync`. File tools are unaffected — they always use direct APIs.
 
-The first command is slower (container startup ~1-2 seconds).
-Subsequent commands are fast (container reused).
+## Implementation Details
 
-To improve cold start:
-1. Pre-build image: `docker build -f Dockerfile.sandbox -t nanoagent-sandbox .`
-2. Keep sandbox running: Container persists across operations
-
-### Permission Errors
-
-The sandbox runs as UID 1000. If you get permission errors:
-
-```bash
-# Check your user ID
-id -u  # Should be 1000
-
-# If different, modify Dockerfile.sandbox:
-# USER <your-uid>:<your-gid>
-```
-
-## Comparison with Industry Standards
-
-| Feature | Nanoagent | Claude Code | LangChain | E2B |
-|---------|-----------|-------------|-----------|-----|
-| Filesystem Isolation | ✅ | ✅ | ✅ | ✅ |
-| Network Isolation | ✅ | ✅ | ✅ | ✅ |
-| Resource Limits | ✅ | ✅ | ✅ | ✅ |
-| Capability Dropping | ✅ | ✅ | ✅ | ✅ |
-| Seccomp Profile | ✅ | ✅ | ✅ | ✅ |
-| Persistent Sessions | ✅ | ✅ | ✅ | ✅ |
-| Network Proxy | ❌ | ✅ | Optional | ✅ |
-| gVisor/Firecracker | ❌ | Optional | Optional | ✅ |
-
-**Nanoagent implements the same core security model as production AI agent platforms.**
-
-## Future Enhancements
-
-Potential improvements (not currently implemented):
-
-- **Network proxy** - Controlled external access with domain allowlists
-- **gVisor runtime** - Enhanced kernel-level isolation
-- **Firecracker microVMs** - Hardware-level isolation
-- **Multi-sandbox support** - Different isolation levels per task
-- **Kubernetes deployment** - Distributed sandbox orchestration
-- **Audit logging** - Complete tool execution logging
-- **Snapshot/restore** - Save sandbox state
-
-## References
-
-- **Anthropic Claude Code Sandboxing**: https://www.anthropic.com/engineering/claude-code-sandboxing
-- **Docker Security Best Practices**: https://docs.docker.com/engine/security/
-- **LangChain Deep Agents Sandboxes**: https://docs.langchain.com/oss/python/deepagents/sandboxes
-- **OpenSandbox (Alibaba)**: https://github.com/alibaba/OpenSandbox
-
-## License
-
-Same as nanoagent (MIT)
+- `spawnSync` (not `execSync`) starts the container — handles paths with spaces
+- Container ID validated against `/^[a-f0-9]{12,64}$/` before use in shell commands
+- `--rm` flag ensures Docker auto-removes the container if the process crashes
+- Timeout of 30 seconds per command, enforced via `setTimeout` + `SIGKILL`
