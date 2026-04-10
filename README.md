@@ -73,7 +73,7 @@ Six tools, all using direct Node/Bun APIs except `bash` which runs in a Docker s
 | `grep` | Search file contents by regex | No |
 | `bash` | Run shell commands | Yes |
 
-File tools use direct APIs — they can only do what their interface allows. `bash` can do anything, so it runs inside a Docker container with no network, no capabilities, and resource limits. See [SANDBOX.md](SANDBOX.md) for details.
+File tools use direct APIs — they can only do what their interface allows. `bash` can do anything, so it runs inside a Docker container with no network, no capabilities, and resource limits. See [docs/SANDBOX.md](docs/SANDBOX.md) for details.
 
 ## Memory
 
@@ -122,7 +122,7 @@ nanoagent/
 ├── nanoagent.ts           # The agent (~650 lines)
 ├── Dockerfile.sandbox     # Sandbox container image
 ├── lessons/               # 12-lesson tutorial series
-├── SANDBOX.md             # Sandbox documentation
+├── docs/                  # Reference documentation
 ├── package.json           # Dependencies
 └── .env.example           # Environment template
 ```
