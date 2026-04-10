@@ -92,15 +92,14 @@ On each new turn:
 
 The current turn is never touched. Only buffered history is evictable. Turns are evicted as whole units — never broken apart.
 
-## Architecture
+## Documentation
 
-~650 lines, single file, 15 sections in dependency order:
+The `docs/` directory has detailed reference documentation:
 
-```
-Imports → Config → Types → Utilities → Sandbox → Tools → Tool Schema →
-Embeddings → Episodic Trace → LLM Interface → Recall → Working Memory →
-Tool Execution → Agentic Loop → Main
-```
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Code structure, 15 sections, execution flow, context window diagram, key design decisions
+- **[MEMORY.md](docs/MEMORY.md)** — Episodic trace format, semantic recall pipeline, working memory assembly, turns buffer, mid-turn eviction
+- **[TOOLS.md](docs/TOOLS.md)** — The 6 tools, passthrough executor pattern, tool registry, auto-generated schemas, how to add new tools
+- **[SANDBOX.md](docs/SANDBOX.md)** — Docker sandbox for bash, security flags, container lifecycle, why only bash is sandboxed
 
 ## Configuration
 
