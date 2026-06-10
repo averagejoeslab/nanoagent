@@ -1,6 +1,6 @@
 # Tools
 
-nanoagent gives the LLM six tools. Five use direct Node/Bun APIs. One (`bash`) runs in a Docker sandbox.
+nanoagent gives the LLM six tools. Five use direct Node/Bun APIs and are confined to the working directory: every path is resolved (symlinks included) and rejected if it escapes `cwd` — the same boundary as the sandbox's `/workspace` mount. One (`bash`) runs in a Docker sandbox.
 
 ## The Six Tools
 

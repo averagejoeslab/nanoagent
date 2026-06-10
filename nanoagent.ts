@@ -5,10 +5,11 @@
  */
 
 // ─── IMPORTS ─────────────────────────────────────────────────────────────────
-import { readFile, writeFile, mkdir, appendFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir, appendFile, realpath } from "node:fs/promises";
 import { execSync, spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
+import { resolve, dirname, basename, sep } from "node:path";
 import * as readline from "node:readline";
 import { Tiktoken } from "js-tiktoken/lite";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
@@ -80,6 +81,26 @@ function totalMessageTokens(messages: Message[]): number {
 
 function getCurrentTimestamp(): string {
   return new Date().toISOString();
+}
+
+// File tools may only touch the working directory — same boundary as the
+// sandbox's /workspace mount. realpath resolves symlinks so a link inside
+// cwd can't point the tools at files outside it.
+let workspaceRoot: string | null = null;
+
+async function safePath(p: string): Promise<string> {
+  workspaceRoot ??= await realpath(process.cwd());
+  const target = resolve(workspaceRoot, p);
+  let real: string;
+  try {
+    real = await realpath(target);
+  } catch {
+    real = resolve(await realpath(dirname(target)), basename(target));
+  }
+  if (real !== workspaceRoot && !real.startsWith(workspaceRoot + sep)) {
+    throw new Error(`path escapes working directory: ${p}`);
+  }
+  return real;
 }
 
 // ─── SANDBOX ─────────────────────────────────────────────────────────────────
@@ -183,7 +204,7 @@ const TOOLS: Record<string, Tool> = {
     desc: "Read file with line numbers. Use offset/limit to paginate large files (0-indexed line numbers)",
     params: ["path", "offset?", "limit?"],
     fn: async (args) => {
-      const lines = (await readFile(args.path, "utf-8")).split("\n");
+      const lines = (await readFile(await safePath(args.path), "utf-8")).split("\n");
       const start = args.offset ?? 0;
       const end = start + (args.limit ?? lines.length);
       return lines.slice(start, end).map((line, i) =>
@@ -195,7 +216,7 @@ const TOOLS: Record<string, Tool> = {
     desc: "Write content to file",
     params: ["path", "content"],
     fn: async (args) => {
-      await writeFile(args.path, args.content, "utf-8");
+      await writeFile(await safePath(args.path), args.content, "utf-8");
       return "ok";
     },
   },
@@ -203,13 +224,14 @@ const TOOLS: Record<string, Tool> = {
     desc: "Replace old with new in file. Use all=true to replace all occurrences",
     params: ["path", "old", "new", "all?"],
     fn: async (args) => {
-      const content = await readFile(args.path, "utf-8");
+      const target = await safePath(args.path);
+      const content = await readFile(target, "utf-8");
       if (!content.includes(args.old)) return "error: old_string not found";
       const escaped = args.old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const count = (content.match(new RegExp(escaped, "g")) ?? []).length;
       if (!args.all && count > 1) return `error: old_string appears ${count} times. Use all=true to replace all`;
       const result = args.all ? content.replaceAll(args.old, args.new) : content.replace(args.old, args.new);
-      await writeFile(args.path, result, "utf-8");
+      await writeFile(target, result, "utf-8");
       return "ok";
     },
   },
@@ -217,6 +239,8 @@ const TOOLS: Record<string, Tool> = {
     desc: "Find files by pattern. Defaults to current directory if path not specified",
     params: ["pat", "path?"],
     fn: async (args) => {
+      await safePath(args.path ?? ".");
+      if (args.pat.includes("..")) return "error: pattern must not contain ..";
       const files: string[] = [];
       for await (const file of new Bun.Glob(`${args.path ?? "."}/${args.pat}`).scan()) {
         files.push(file);
@@ -229,11 +253,12 @@ const TOOLS: Record<string, Tool> = {
     params: ["pat", "path?"],
     fn: async (args) => {
       const pattern = new RegExp(args.pat);
+      await safePath(args.path ?? ".");
       const hits: string[] = [];
       for await (const file of new Bun.Glob(`${args.path ?? "."}/**`).scan()) {
         if (file.includes("node_modules")) continue;
         try {
-          const content = await readFile(file, "utf-8");
+          const content = await readFile(await safePath(file), "utf-8");
           content.split("\n").forEach((line, i) => {
             if (pattern.test(line)) hits.push(`${file}:${i + 1}:${line.trim()}`);
           });
@@ -550,7 +575,7 @@ async function agenticLoop(
   workingBudget: number,
   bufferEnd: number,
   bufferTurnSizes: number[],
-): Promise<void> {
+): Promise<number> {
   while (true) {
     // Enforce budget: evict oldest turns from buffer if over
     bufferEnd = evictOldestTurns(messages, workingBudget, bufferEnd, bufferTurnSizes);
@@ -594,6 +619,10 @@ async function agenticLoop(
     // Feed tool results back
     messages.push({ role: "user", content: toolResults });
   }
+
+  // Eviction shifts messages from the front; callers must slice the current
+  // turn with this corrected index, not the one from assembleWorkingMemory
+  return bufferEnd;
 }
 
 // ─── MAIN ────────────────────────────────────────────────────────────────────
@@ -619,8 +648,8 @@ Current time: ${getCurrentTimestamp()}${
   // ── One-off mode ──
   if (oneOffPrompt) {
     const ctx = await assembleWorkingMemory(oneOffPrompt, baseSystemPrompt);
-    await agenticLoop(ctx.messages, ctx.systemPrompt, ctx.workingBudget, ctx.bufferEnd, ctx.bufferTurnSizes);
-    await saveEpisode(ctx.messages.slice(ctx.bufferEnd));
+    const bufferEnd = await agenticLoop(ctx.messages, ctx.systemPrompt, ctx.workingBudget, ctx.bufferEnd, ctx.bufferTurnSizes);
+    await saveEpisode(ctx.messages.slice(bufferEnd));
     return;
   }
 
@@ -654,8 +683,8 @@ ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}${USE
     }
 
     const ctx = await assembleWorkingMemory(input, baseSystemPrompt);
-    await agenticLoop(ctx.messages, ctx.systemPrompt, ctx.workingBudget, ctx.bufferEnd, ctx.bufferTurnSizes);
-    await saveEpisode(ctx.messages.slice(ctx.bufferEnd));
+    const bufferEnd = await agenticLoop(ctx.messages, ctx.systemPrompt, ctx.workingBudget, ctx.bufferEnd, ctx.bufferTurnSizes);
+    await saveEpisode(ctx.messages.slice(bufferEnd));
 
     console.log();
   }

@@ -88,7 +88,7 @@ For trusted environments:
 DISABLE_SANDBOX=true bun nanoagent.ts
 ```
 
-When disabled, `bash` runs directly on the host via `execSync`. File tools are unaffected — they always use direct APIs.
+When disabled, `bash` runs directly on the host via `execSync`. File tools are unaffected — they always use direct APIs, confined to the working directory by path validation.
 
 ## Implementation Details
 

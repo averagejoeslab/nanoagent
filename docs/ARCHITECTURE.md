@@ -62,6 +62,8 @@ agenticLoop(messages, systemPrompt, workingBudget, bufferEnd, bufferTurnSizes)
       ├── Execute tool calls in parallel (Promise.all)
       ├── Push assistant response + tool results onto messages
       └── Break if no tool calls
+  │
+  └── Returns bufferEnd (corrected if eviction shifted messages)
           │
           ▼
 saveEpisode(messages.slice(bufferEnd))
