@@ -1,22 +1,14 @@
 # Open Issues
 
-## Critical (2)
-
-- [#80](https://github.com/averagejoeslab/nanoagent/issues/80) - API Key Format Validation Missing
-- [#94](https://github.com/averagejoeslab/nanoagent/issues/94) - Missing tsconfig.json - No strict type checking enforced
+## Critical (1)
+- [#106](https://github.com/averagejoeslab/nanoagent/issues/106) - No global error handlers for unhandled promise rejections
 
 ## High (3)
-
-- [#47](https://github.com/averagejoeslab/nanoagent/issues/47) - Silent Failures in Tool Execution - grep and loadTrace
-- [#65](https://github.com/averagejoeslab/nanoagent/issues/65) - Add max iteration limit to prevent infinite agentic loops
-- [#89](https://github.com/averagejoeslab/nanoagent/issues/89) - API response structure not validated before use
-- [#95](https://github.com/averagejoeslab/nanoagent/issues/95) - No API timeout causes application hangs
+- [#23](https://github.com/averagejoeslab/nanoagent/issues/23) - Security: ReDoS vulnerability in regex handling
+- [#107](https://github.com/averagejoeslab/nanoagent/issues/107) - No size validation on tool results before adding to context
+- [#108](https://github.com/averagejoeslab/nanoagent/issues/108) - Race condition in getSandbox() allows multiple containers
 
 ## Medium (13)
-
-- [#11](https://github.com/averagejoeslab/nanoagent/issues/11) - Race condition in concurrent file writes to trace
-- [#23](https://github.com/averagejoeslab/nanoagent/issues/23) - Security: ReDoS vulnerability in regex handling
-- [#41](https://github.com/averagejoeslab/nanoagent/issues/41) - No file size limits in grep tool
 - [#49](https://github.com/averagejoeslab/nanoagent/issues/49) - Missing Docker Availability Check
 - [#50](https://github.com/averagejoeslab/nanoagent/issues/50) - Container Not Cleaned Up on Sandbox Start Failure
 - [#66](https://github.com/averagejoeslab/nanoagent/issues/66) - Move API key validation to startup
@@ -28,11 +20,13 @@
 - [#101](https://github.com/averagejoeslab/nanoagent/issues/101) - File write operations are not atomic
 - [#102](https://github.com/averagejoeslab/nanoagent/issues/102) - executeTool lacks detailed error context
 - [#104](https://github.com/averagejoeslab/nanoagent/issues/104) - No prominent warning when sandbox is disabled in REPL mode
+- [#105](https://github.com/averagejoeslab/nanoagent/issues/105) - Comprehensive Documentation Updates Needed
+- [#109](https://github.com/averagejoeslab/nanoagent/issues/109) - Embedding model pipeline never cleaned up (memory leak)
 
-## Low (27)
-
+## Low (37)
 - [#5](https://github.com/averagejoeslab/nanoagent/issues/5) - Weak type safety with excessive use of 'any'
 - [#10](https://github.com/averagejoeslab/nanoagent/issues/10) - Missing input validation for tool parameters
+- [#11](https://github.com/averagejoeslab/nanoagent/issues/11) - Race condition in concurrent file writes to trace
 - [#12](https://github.com/averagejoeslab/nanoagent/issues/12) - File system errors lack helpful context
 - [#13](https://github.com/averagejoeslab/nanoagent/issues/13) - Memory leak: tokenizer not freed on exit
 - [#14](https://github.com/averagejoeslab/nanoagent/issues/14) - Readline interface not closed on error
@@ -52,6 +46,7 @@
 - [#38](https://github.com/averagejoeslab/nanoagent/issues/38) - Add consistent result limits across tools
 - [#39](https://github.com/averagejoeslab/nanoagent/issues/39) - Add stdin TTY validation for interactive mode
 - [#40](https://github.com/averagejoeslab/nanoagent/issues/40) - Fix empty file handling edge case
+- [#41](https://github.com/averagejoeslab/nanoagent/issues/41) - No file size limits in grep tool
 - [#53](https://github.com/averagejoeslab/nanoagent/issues/53) - Platform Compatibility - process.getuid/getgid Not Available on Windows
 - [#54](https://github.com/averagejoeslab/nanoagent/issues/54) - Improve Variable Naming for Clarity
 - [#57](https://github.com/averagejoeslab/nanoagent/issues/57) - Missing retry logic for API calls
@@ -66,22 +61,9 @@
 - [#78](https://github.com/averagejoeslab/nanoagent/issues/78) - Performance - Inefficient token budget loading for large traces
 - [#81](https://github.com/averagejoeslab/nanoagent/issues/81) - Missing error context and stack traces in fatal error handler
 
-## Documentation (2)
-
-- [#20](https://github.com/averagejoeslab/nanoagent/issues/20) - README: Update shell timeout documentation
-- [#105](https://github.com/averagejoeslab/nanoagent/issues/105) - Comprehensive Documentation Updates Needed
-
 ---
 
-**Total Open Issues:** 59
+**Total Open Issues: 54**
 
-**Summary:**
-- Critical: 2
-- High: 4
-- Medium: 14
-- Low: 37
-- Documentation: 2
-
-**Issues Closed During Review:** 2
-- [#96](https://github.com/averagejoeslab/nanoagent/issues/96) - Path traversal vulnerability (FIXED - safePath validation implemented)
-- [#74](https://github.com/averagejoeslab/nanoagent/issues/74) - Uncaught promise rejections in signal handlers (FIXED - handlers are now synchronous)
+Last updated: 2026-06-10
+Generated by nanoagent issue reconciliation workflow
