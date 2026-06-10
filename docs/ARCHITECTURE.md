@@ -6,7 +6,7 @@ nanoagent is a single TypeScript file (~650 lines) organized into 15 sections. E
 
 ```
  1. Imports           Node.js modules, Tiktoken, Xenova transformers
- 2. Config            API_URL, MODEL, MAX_TOKENS, CONTEXT_WINDOW, RECALL_THRESHOLD, sandbox settings
+ 2. Config            API_URL, MODEL, MAX_TOKENS, CONTEXT_WINDOW, RECALL_THRESHOLD, API_TIMEOUT, MAX_ITERATIONS, sandbox settings
  3. Types             Message, Tool, ExecResult, TraceTurn
  4. Utilities         Tokenizer (countTokens, messageTokens, totalMessageTokens), getCurrentTimestamp
  5. Sandbox           Sandbox class, getSandbox singleton, Docker lifecycle

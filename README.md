@@ -107,6 +107,8 @@ The `docs/` directory has detailed reference documentation:
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | (required) | Anthropic API key |
 | `DISABLE_SANDBOX` | `false` | Set to `true` to run bash on host |
+| `API_TIMEOUT` | `60000` | API call timeout in milliseconds |
+| `MAX_ITERATIONS` | `50` | Max agentic loop iterations per turn |
 
 ## Prerequisites
 

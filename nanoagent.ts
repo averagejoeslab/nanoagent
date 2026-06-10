@@ -23,6 +23,8 @@ const SHELL_TIMEOUT = 30000;
 const TRACE_FILE = `${homedir()}/.nanoagent/trace.jsonl`;
 const CONTEXT_WINDOW = 200000;
 const RECALL_THRESHOLD = 0.3;
+const API_TIMEOUT = parseInt(process.env.API_TIMEOUT ?? "", 10) || 60000;
+const MAX_ITERATIONS = parseInt(process.env.MAX_ITERATIONS ?? "", 10) || 50;
 
 const USE_SANDBOX = process.env.DISABLE_SANDBOX !== "true";
 const SANDBOX_MEMORY = "512m";
@@ -138,7 +140,7 @@ class Sandbox {
       "nanoagent-sandbox",
     ];
 
-    const result = spawnSync(args[0], args.slice(1), { encoding: "utf-8", timeout: 10000 });
+    const result = spawnSync("docker", args.slice(1), { encoding: "utf-8", timeout: 10000 });
     if (result.status !== 0) throw new Error(`Failed to start sandbox: ${result.stderr || result.error?.message}`);
 
     this.containerId = result.stdout.trim();
@@ -255,6 +257,7 @@ const TOOLS: Record<string, Tool> = {
       const pattern = new RegExp(args.pat);
       await safePath(args.path ?? ".");
       const hits: string[] = [];
+      let skipped = 0;
       for await (const file of new Bun.Glob(`${args.path ?? "."}/**`).scan()) {
         if (file.includes("node_modules")) continue;
         try {
@@ -262,9 +265,12 @@ const TOOLS: Record<string, Tool> = {
           content.split("\n").forEach((line, i) => {
             if (pattern.test(line)) hits.push(`${file}:${i + 1}:${line.trim()}`);
           });
-        } catch {}
+        } catch {
+          skipped++;
+        }
       }
-      return hits.slice(0, 50).join("\n") || "none";
+      const out = hits.slice(0, 50).join("\n") || "none";
+      return skipped > 0 ? `${out}\n(skipped ${skipped} unreadable file${skipped === 1 ? "" : "s"})` : out;
     },
   },
   bash: {
@@ -332,9 +338,10 @@ async function embed(text: string): Promise<number[]> {
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0, magA = 0, magB = 0;
   for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    magA += a[i] * a[i];
-    magB += b[i] * b[i];
+    const x = a[i]!, y = b[i]!;
+    dot += x * y;
+    magA += x * x;
+    magB += y * y;
   }
   return dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
@@ -342,12 +349,30 @@ function cosineSimilarity(a: number[], b: number[]): number {
 // ─── EPISODIC TRACE ──────────────────────────────────────────────────────────
 
 async function loadEpisodicTrace(): Promise<TraceTurn[]> {
+  let content: string;
   try {
-    const content = await readFile(TRACE_FILE, "utf-8");
-    return content.trim().split("\n").map((line) => JSON.parse(line));
-  } catch {
+    content = await readFile(TRACE_FILE, "utf-8");
+  } catch (err: any) {
+    if (err.code !== "ENOENT") {
+      console.error(`${ANSI.red}Error reading trace: ${err.message}${ANSI.reset}`);
+    }
     return [];
   }
+
+  const turns: TraceTurn[] = [];
+  let corrupted = 0;
+  for (const line of content.trim().split("\n")) {
+    if (!line) continue;
+    try {
+      turns.push(JSON.parse(line));
+    } catch {
+      corrupted++;
+    }
+  }
+  if (corrupted > 0) {
+    console.error(`${ANSI.dim}Warning: skipped ${corrupted} corrupted trace line${corrupted === 1 ? "" : "s"}${ANSI.reset}`);
+  }
+  return turns;
 }
 
 function turnTokens(turn: TraceTurn): number {
@@ -374,26 +399,52 @@ async function saveEpisode(messages: Message[]): Promise<void> {
 }
 
 // ─── LLM INTERFACE ──────────────────────────────────────────────────────────
-async function callLLM(messages: Message[], systemPrompt: string, useTools = true) {
+async function callLLM(messages: Message[], systemPrompt: string, useTools = true, toolChoice?: "none") {
   const body: any = {
     model: MODEL,
     max_tokens: MAX_TOKENS,
     system: systemPrompt,
     messages,
   };
-  if (useTools) body.tools = TOOL_SCHEMAS;
+  if (useTools) {
+    body.tools = TOOL_SCHEMAS;
+    if (toolChoice) body.tool_choice = { type: toolChoice };
+  }
 
-  const response = await fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) throw new Error(`API error: ${response.status}`);
-  return response.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT);
+  let response: Response;
+  try {
+    response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    if (err.name === "AbortError") throw new Error(`API call timed out after ${API_TIMEOUT}ms`);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const data: any = await response.json();
+      if (data?.error?.message) detail = `: ${data.error.message}`;
+    } catch {}
+    throw new Error(`API error: ${response.status}${detail}`);
+  }
+
+  const data: any = await response.json();
+  if (data?.type === "error") throw new Error(`API error: ${data.error?.message ?? "unknown"}`);
+  if (!Array.isArray(data?.content)) throw new Error("API error: malformed response (missing content array)");
+  return data;
 }
 
 // ─── RECALL ──────────────────────────────────────────────────────────────────
@@ -408,7 +459,7 @@ async function recallMemories(query: string, allTurns: TraceTurn[], recentTurns:
     .sort((a, b) => b.score - a.score);
 
   // Skip reranking if nothing is relevant
-  if (!scored.length || scored[0].score < RECALL_THRESHOLD) return "";
+  if (!scored.length || scored[0]!.score < RECALL_THRESHOLD) return "";
 
   const candidates = scored.slice(0, 10).map((c) => c.turn);
 
@@ -516,7 +567,7 @@ async function assembleWorkingMemory(input: string, baseSystemPrompt: string): P
   let bufferTokens = 0;
 
   for (let i = allTurns.length - 1; i >= 0; i--) {
-    const turn = allTurns[i];
+    const turn = allTurns[i]!;
     const tokens = turnTokens(turn);
     if (bufferTokens + tokens > bufferBudget) break;
     bufferTurns.unshift(turn);
@@ -548,7 +599,7 @@ function evictOldestTurns(
   while (total > workingBudget && bufferTurnSizes.length > 0) {
     const turnSize = bufferTurnSizes.shift()!;
     for (let i = 0; i < turnSize; i++) {
-      total -= messageTokens(messages[0]);
+      total -= messageTokens(messages[0]!);
       messages.splice(0, 1);
     }
     bufferEnd -= turnSize;
@@ -576,7 +627,7 @@ async function agenticLoop(
   bufferEnd: number,
   bufferTurnSizes: number[],
 ): Promise<number> {
-  while (true) {
+  for (let iteration = 1; ; iteration++) {
     // Enforce budget: evict oldest turns from buffer if over
     bufferEnd = evictOldestTurns(messages, workingBudget, bufferEnd, bufferTurnSizes);
 
@@ -618,6 +669,19 @@ async function agenticLoop(
 
     // Feed tool results back
     messages.push({ role: "user", content: toolResults });
+
+    // Cap runaway loops. One final call with tool_choice none produces a
+    // wrap-up assistant message, so the saved turn never ends on a dangling
+    // tool exchange
+    if (iteration >= MAX_ITERATIONS) {
+      console.log(`\n${ANSI.red}⏺ Reached MAX_ITERATIONS (${MAX_ITERATIONS}) — wrapping up${ANSI.reset}`);
+      const final = await callLLM(messages, systemPrompt, true, "none");
+      for (const block of final.content.filter((b: any) => b.type === "text")) {
+        console.log(`\n${ANSI.cyan}⏺${ANSI.reset} ${block.text}`);
+      }
+      messages.push({ role: "assistant", content: final.content });
+      break;
+    }
   }
 
   // Eviction shifts messages from the front; callers must slice the current
@@ -627,9 +691,14 @@ async function agenticLoop(
 
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 async function main() {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) {
     console.error(`${ANSI.red}Error: ANTHROPIC_API_KEY not set${ANSI.reset}`);
     console.error(`${ANSI.dim}Set it in .env file or environment${ANSI.reset}`);
+    process.exit(1);
+  }
+  if (!apiKey.startsWith("sk-ant-") || apiKey.length < 20) {
+    console.error(`${ANSI.red}Error: ANTHROPIC_API_KEY looks invalid (expected sk-ant-...)${ANSI.reset}`);
     process.exit(1);
   }
 
@@ -682,9 +751,14 @@ ${ANSI.dim}${MODEL}${ANSI.reset} | ${ANSI.dim}${process.cwd()}${ANSI.reset}${USE
       continue;
     }
 
-    const ctx = await assembleWorkingMemory(input, baseSystemPrompt);
-    const bufferEnd = await agenticLoop(ctx.messages, ctx.systemPrompt, ctx.workingBudget, ctx.bufferEnd, ctx.bufferTurnSizes);
-    await saveEpisode(ctx.messages.slice(bufferEnd));
+    // On error, skip saveEpisode — a half-finished turn must not enter the trace
+    try {
+      const ctx = await assembleWorkingMemory(input, baseSystemPrompt);
+      const bufferEnd = await agenticLoop(ctx.messages, ctx.systemPrompt, ctx.workingBudget, ctx.bufferEnd, ctx.bufferTurnSizes);
+      await saveEpisode(ctx.messages.slice(bufferEnd));
+    } catch (err: any) {
+      console.error(`\n${ANSI.red}⏺ ${err.message ?? err}${ANSI.reset}`);
+    }
 
     console.log();
   }
