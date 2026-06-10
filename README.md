@@ -146,7 +146,7 @@ The `lessons/` directory teaches you to build nanoagent from scratch in 12 lesso
 11. **[Working Memory](lessons/11-working-memory.md)** — Assembly order, turns buffer, mid-turn eviction
 
 **Make it safe:**
-12. **[Sandbox Command Execution](lessons/12-sandbox-command-execution.md)** — Docker for bash, security flags, why only bash needs it
+12. **[Sandbox Command Execution](lessons/12-sandbox-command-execution.md)** — Path confinement for file tools, Docker for bash, security flags
 
 ## License
 

@@ -127,15 +127,19 @@ async function agenticLoop(
   workingBudget: number,
   bufferEnd: number,
   bufferTurnSizes: number[],
-): Promise<void> {
+): Promise<number> {
   while (true) {
     bufferEnd = evictOldestTurns(messages, workingBudget, bufferEnd, bufferTurnSizes);
 
     const response = await callLLM(messages, systemPrompt);
     // ... rest of loop unchanged ...
   }
+
+  return bufferEnd;
 }
 ```
+
+Note the return value. Eviction splices messages off the *front* of the array, which shifts every index — including the boundary between buffered history and the current turn. The loop tracks the corrected `bufferEnd` as it evicts, and hands it back to the caller when the turn ends. JavaScript passes numbers by value, so without the return, the caller would still be holding the original, now-stale index.
 
 ## The Unified Flow
 
@@ -143,16 +147,18 @@ Both modes — REPL and one-off — use the same three steps:
 
 ```typescript
 const ctx = await assembleWorkingMemory(input, baseSystemPrompt);
-await agenticLoop(ctx.messages, ctx.systemPrompt, ctx.workingBudget, ctx.bufferEnd, ctx.bufferTurnSizes);
-await saveEpisode(ctx.messages.slice(ctx.bufferEnd));
+const bufferEnd = await agenticLoop(ctx.messages, ctx.systemPrompt, ctx.workingBudget, ctx.bufferEnd, ctx.bufferTurnSizes);
+await saveEpisode(ctx.messages.slice(bufferEnd));
 ```
 
 Assemble → loop → save. Before the turn, during the turn, after the turn.
 
-`ctx.messages.slice(ctx.bufferEnd)` captures just the current turn — from the user's input through all tool calls to the final response. That's what gets saved as the next episode in the trace.
+`ctx.messages.slice(bufferEnd)` — using the bufferEnd *returned by the loop* — captures just the current turn: from the user's input through all tool calls to the final response. That's what gets saved as the next episode in the trace.
+
+This is a subtle trap worth dwelling on. If you slice with `ctx.bufferEnd` (the pre-loop value) and eviction happened mid-turn, the index points too far into the array: the saved episode silently loses the start of the turn, and can even begin with a `tool_result` whose matching `tool_use` was cut off. That orphaned message gets replayed from the trace into future API calls — which the API rejects. One over-budget session would poison every session after it. The bug only fires when eviction fires, so it hides until your trace grows large enough.
 
 ## What We Have
 
 Foolproof context management. Every token is counted. The budget is enforced on every API call. History gracefully shrinks as the current task grows. The current turn is never touched. The agent handles long, complex tasks without crashing.
 
-One thing remains. The `bash` tool can run any command — `rm -rf /`, `curl malicious-site.com`, anything. Let's contain it.
+One thing remains. The file tools can touch any path on your machine, and the `bash` tool can run any command — `rm -rf /`, `curl malicious-site.com`, anything. Let's contain them.

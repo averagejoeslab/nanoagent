@@ -1,14 +1,56 @@
 # Lesson 12: Sandbox Command Execution
 
-Five of our tools — `read`, `write`, `edit`, `glob`, `grep` — use direct Node/Bun APIs. They can only do what their interface allows: read a file, write a file, search by pattern.
+Five of our tools — `read`, `write`, `edit`, `glob`, `grep` — use direct Node/Bun APIs. Each can only do what its interface allows: read a file, write a file, search by pattern. But the interface says nothing about *where*. `read` will happily read `~/.ssh/id_rsa`. `write` will happily write to `~/.bashrc` — and whatever it writes there runs the next time you open a terminal. An interface constraint without a path constraint isn't much of a constraint at all.
 
-`bash` is different. It runs arbitrary shell commands. The LLM could execute:
+`bash` is worse. It runs arbitrary shell commands. The LLM could execute:
 - `curl` to download and run malicious scripts
 - `rm -rf /` to destroy the filesystem
 - `cat ~/.ssh/id_rsa` to read your private keys
 - Anything the shell can do
 
-File tools are **structurally constrained**. `bash` is **structurally unconstrained**. We need to contain it.
+So we need two boundaries: confine the file tools to the project directory, and contain `bash` in a sandbox.
+
+## Confining the File Tools
+
+The file tools get a path guard. Every path is resolved to its real location and rejected if it lands outside the working directory:
+
+```typescript
+import { realpath } from "node:fs/promises";
+import { resolve, dirname, basename, sep } from "node:path";
+
+let workspaceRoot: string | null = null;
+
+async function safePath(p: string): Promise<string> {
+  workspaceRoot ??= await realpath(process.cwd());
+  const target = resolve(workspaceRoot, p);
+  let real: string;
+  try {
+    real = await realpath(target);
+  } catch {
+    real = resolve(await realpath(dirname(target)), basename(target));
+  }
+  if (real !== workspaceRoot && !real.startsWith(workspaceRoot + sep)) {
+    throw new Error(`path escapes working directory: ${p}`);
+  }
+  return real;
+}
+```
+
+Three things are happening here:
+
+1. **`resolve` normalizes** — `../../../etc/passwd` becomes an absolute path that fails the prefix check.
+2. **`realpath` follows symlinks** — a link *inside* the project pointing *outside* it resolves to its real target, which fails the check. Without this, the path check is decoration.
+3. **The catch handles files that don't exist yet** — `write` creates new files, and you can't `realpath` a file that isn't there. So we resolve the parent directory instead and check that.
+
+Each tool runs its path through the guard — for `read` it's a one-word change:
+
+```typescript
+const lines = (await readFile(await safePath(args.path), "utf-8")).split("\n");
+```
+
+Same for `write` and `edit`. `glob` and `grep` validate their directory param, `glob` rejects patterns containing `..`, and `grep` checks each file before reading it — so a symlink sitting inside the project can't leak files from outside it.
+
+When the guard throws, `executeTool`'s catch turns it into a string — `Error: path escapes working directory: ...` — and the LLM reads it and self-corrects, same as any other tool error.
 
 ## Docker Sandbox
 
@@ -127,9 +169,13 @@ process.on("SIGTERM", () => process.exit(0));
 const result = spawnSync(args[0], args.slice(1), { encoding: "utf-8", timeout: 10000 });
 ```
 
-## Why Only Bash
+## Why Only Bash Gets a Container
 
-This is the same design Claude Code and Codex CLI use. File tools use direct APIs with constrained interfaces — `read` can only read, `edit` can only replace. They can't access the network, spawn processes, or escalate privileges. The dangerous boundary is arbitrary command execution. That's what gets sandboxed.
+Notice the two boundaries are the *same boundary*. The file tools are confined to the working directory by `safePath`; the container mounts only the working directory at `/workspace`. Whichever tool the LLM picks, it can touch the project and nothing else.
+
+So why does `bash` need a whole container when the file tools got by with ten lines? Because file tools have narrow interfaces — `read` can only read, `edit` can only replace — and a path guard closes the one hole the interface leaves open. `bash` has no interface to guard: it can open sockets, spawn processes, exhaust memory, escalate privileges. There's no string check for that. The only way to constrain arbitrary command execution is to run it somewhere with nothing to steal and no way out. That's what the container is.
+
+This is the same design Claude Code and Codex CLI use: structured tools with tight interfaces run directly, arbitrary execution gets isolated.
 
 ## The Updated Bash Tool
 
@@ -175,8 +221,9 @@ A coding agent in ~650 lines of TypeScript:
 - **Episodic memory** — whole turns saved with embeddings
 - **Semantic recall** — vector search + LLM reranking
 - **Working memory** — token-accurate budgeting with mid-turn eviction
+- **Path confinement** — file tools can't escape the working directory
 - **Docker sandbox** — bash runs with no network, no capabilities, resource limits
 
-The architecture is clean. The context window is managed. The memory is persistent and searchable. Command execution is contained.
+The architecture is clean. The context window is managed. The memory is persistent and searchable. File access is confined to the project. Command execution is contained.
 
 You built an agent.
